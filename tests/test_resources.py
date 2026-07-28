@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 
-COLLECTIONS = {
+CORE_COLLECTIONS = {
     "customers",
     "suppliers",
     "sales_invoices",
@@ -12,6 +12,29 @@ COLLECTIONS = {
     "chart_of_accounts",
     "bank_accounts",
 }
+# Synced from writable.py so create_* results can be verified via get_record.
+WRITABLE_COLLECTIONS = {
+    "sales_quotes",
+    "purchase_quotes",
+    "sales_orders",
+    "purchase_orders",
+    "inventory_items",
+    "non_inventory_items",
+    "credit_notes",
+    "delivery_notes",
+    "debit_notes",
+    "goods_receipts",
+    "receipts",
+    "payments",
+    "inter_account_transfers",
+    "employees",
+    "payslips",
+    "expense_claims",
+    "journal_entries",
+    "depreciation_entries",
+    "amortization_entries",
+}
+COLLECTIONS = CORE_COLLECTIONS | WRITABLE_COLLECTIONS
 REPORTS = {
     "aged_receivables",
     "aged_payables",
@@ -41,6 +64,8 @@ def test_form_path_collections() -> None:
     assert form_path("sales_invoices", "x") == "/sales-invoice-form/x"
     assert form_path("purchase_invoices", "x") == "/purchase-invoice-form/x"
     assert form_path("bank_accounts", "k1") == "/bank-or-cash-account-form/k1"
+    assert form_path("receipts", "r1") == "/receipt-form/r1"
+    assert form_path("payments", "p1") == "/payment-form/p1"
 
 
 def test_form_path_reports_and_coa_none() -> None:

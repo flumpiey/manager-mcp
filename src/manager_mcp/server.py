@@ -120,6 +120,7 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
     )
 )
 async def list_resources() -> dict[str, Any]:
+    policy = get_policy()
     resources = [
         {
             "name": r.name,
@@ -129,17 +130,36 @@ async def list_resources() -> dict[str, Any]:
         }
         for r in all_resources()
     ]
+    write_scopes = sorted(policy.write_scopes)
+    delete_scopes = sorted(policy.delete_scopes)
+    read_only = not (write_scopes or delete_scopes)
+    if read_only:
+        boundary = (
+            "Default is read-only: no create/update/delete tools are registered. "
+            "Set MANAGER_MCP_WRITE_SCOPES / MANAGER_MCP_DELETE_SCOPES to enable mutations."
+        )
+    else:
+        boundary = (
+            "Scoped writes enabled. create_*/update_* require WRITE_SCOPES; "
+            "delete_* require DELETE_SCOPES. Client denylist still blocks never-writable "
+            f"paths. write_scopes={write_scopes}; delete_scopes={delete_scopes}. "
+            "After creating a record, verify with list_records/get_record on the same "
+            "collection (e.g. receipts)."
+        )
     return {
         "resources": resources,
-        "read_only": True,
-        "boundary": "Read-only: no create, edit, post, or delete operations are available.",
+        "read_only": read_only,
+        "write_scopes": write_scopes,
+        "delete_scopes": delete_scopes,
+        "boundary": boundary,
     }
 
 
 @mcp.tool(
     description=(
-        "Search/page a curated collection (customers, suppliers, sales_invoices, "
-        "purchase_invoices, chart_of_accounts, bank_accounts). "
+        "Search/page a curated collection. Core: customers, suppliers, sales_invoices, "
+        "purchase_invoices, chart_of_accounts, bank_accounts. Also writable domains "
+        "when present in discovery (e.g. receipts, payments, sales_quotes). "
         "bank_accounts is the searchable collection; use bank_balances for snapshot balances."
     )
 )

@@ -93,15 +93,38 @@ async def test_report_shortcuts(name: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_resources_boundary() -> None:
+async def test_list_resources_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MANAGER_MCP_WRITE_SCOPES", raising=False)
+    monkeypatch.delenv("MANAGER_MCP_DELETE_SCOPES", raising=False)
+    from manager_mcp.server import reset_client
+
+    reset_client()
     out = await _call("list_resources")
     assert out["read_only"] is True
+    assert out["write_scopes"] == []
     assert "create" in out["boundary"].casefold() or "delete" in out["boundary"].casefold()
     names = {r["name"] for r in out["resources"]}
     assert "customers" in names
+    assert "receipts" in names
     assert "aged_receivables" in names
     assert "bank_balances" in names
     assert "bank_accounts" in names
+
+
+@pytest.mark.asyncio
+async def test_list_resources_reports_scopes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MANAGER_MCP_WRITE_SCOPES", "banking")
+    monkeypatch.setenv("MANAGER_MCP_DELETE_SCOPES", "banking")
+    for name in ("MANAGER_MCP_ALLOW_WRITES", "ALLOW_WRITES", "MANAGER_MCP_WRITES"):
+        monkeypatch.delenv(name, raising=False)
+    from manager_mcp.server import reset_client
+
+    reset_client()
+    out = await _call("list_resources")
+    assert out["read_only"] is False
+    assert out["write_scopes"] == ["banking"]
+    assert "receipts" in out["boundary"].casefold()
+    assert "scoped writes enabled" in out["boundary"].casefold()
 
 
 @pytest.mark.asyncio

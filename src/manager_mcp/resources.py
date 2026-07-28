@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from manager_mcp.writable import WRITABLE
+
 
 @dataclass(frozen=True)
 class ResourceDescriptor:
@@ -17,60 +19,69 @@ class ResourceDescriptor:
     date_params: tuple[str, ...] = field(default_factory=tuple)
 
 
-# Paths validated against live OpenAPI (desktop /api2, 2026-07-28).
-_RESOURCES: dict[str, ResourceDescriptor] = {
-    "customers": ResourceDescriptor(
-        "customers",
+def _collection(
+    name: str,
+    path: str,
+    description: str,
+    *,
+    form_template: str | None,
+    items_key: str,
+) -> ResourceDescriptor:
+    return ResourceDescriptor(
+        name,
         "collection",
+        path,
+        description,
+        supports_form=form_template is not None,
+        form_path_template=form_template,
+        items_key=items_key,
+    )
+
+
+# Core v1 collections + reports. Writable domains are merged below so agents
+# can list/get what create_*/update_* may post (e.g. receipts).
+_BASE_RESOURCES: dict[str, ResourceDescriptor] = {
+    "customers": _collection(
+        "customers",
         "/customers",
         "Customers collection (search, page, fetch by key)",
-        supports_form=True,
-        form_path_template="/customer-form/{key}",
+        form_template="/customer-form/{key}",
         items_key="customers",
     ),
-    "suppliers": ResourceDescriptor(
+    "suppliers": _collection(
         "suppliers",
-        "collection",
         "/suppliers",
         "Suppliers collection (search, page, fetch by key)",
-        supports_form=True,
-        form_path_template="/supplier-form/{key}",
+        form_template="/supplier-form/{key}",
         items_key="suppliers",
     ),
-    "sales_invoices": ResourceDescriptor(
+    "sales_invoices": _collection(
         "sales_invoices",
-        "collection",
         "/sales-invoices",
         "Sales invoices collection",
-        supports_form=True,
-        form_path_template="/sales-invoice-form/{key}",
+        form_template="/sales-invoice-form/{key}",
         items_key="salesInvoices",
     ),
-    "purchase_invoices": ResourceDescriptor(
+    "purchase_invoices": _collection(
         "purchase_invoices",
-        "collection",
         "/purchase-invoices",
         "Purchase invoices collection",
-        supports_form=True,
-        form_path_template="/purchase-invoice-form/{key}",
+        form_template="/purchase-invoice-form/{key}",
         items_key="purchaseInvoices",
     ),
-    "chart_of_accounts": ResourceDescriptor(
+    "chart_of_accounts": _collection(
         "chart_of_accounts",
-        "collection",
         "/chart-of-accounts",
         "Chart of accounts collection (list/search only; no single form endpoint)",
-        supports_form=False,
+        form_template=None,
         items_key="chartOfAccounts",
     ),
-    "bank_accounts": ResourceDescriptor(
+    "bank_accounts": _collection(
         "bank_accounts",
-        "collection",
         "/bank-and-cash-accounts",
         "Bank/cash accounts collection for search and drill-in "
         "(distinct from bank_balances snapshot)",
-        supports_form=True,
-        form_path_template="/bank-or-cash-account-form/{key}",
+        form_template="/bank-or-cash-account-form/{key}",
         items_key="bankAndCashAccounts",
     ),
     # Reports: Manager "*-form" report builders require POST (writes). v1 uses
@@ -129,6 +140,31 @@ _RESOURCES: dict[str, ResourceDescriptor] = {
         items_key="taxSummaryTransactions",
     ),
 }
+
+
+def _merge_writable_collections(
+    base: dict[str, ResourceDescriptor],
+) -> dict[str, ResourceDescriptor]:
+    merged = dict(base)
+    for writable in WRITABLE.values():
+        if writable.name in merged:
+            continue
+        label = writable.name.replace("_", " ")
+        merged[writable.name] = _collection(
+            writable.name,
+            writable.list_path,
+            (
+                f"{label} collection (search, page, fetch by key; "
+                f"mutations via create_{writable.tool_stem} / "
+                f"update_{writable.tool_stem} / delete_{writable.tool_stem} when scoped)"
+            ),
+            form_template=f"{writable.form_path}/{{key}}",
+            items_key=writable.items_key,
+        )
+    return merged
+
+
+_RESOURCES: dict[str, ResourceDescriptor] = _merge_writable_collections(_BASE_RESOURCES)
 
 
 def resolve(name: str) -> ResourceDescriptor | None:
