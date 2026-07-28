@@ -9,31 +9,71 @@ create/update/delete.
 - Python >= 3.10
 - Reachable Manager.io API (`MANAGER_API_URL` + `MANAGER_API_KEY`)
 
-## Install / run
+## Run (stdio MCP — no global install)
+
+This is a **Python** package. The `npx` equivalent is **`uvx`** (ships with [uv](https://docs.astral.sh/uv/)).
+Transport is **stdio** by default (`manager-mcp` → `mcp.run()`).
+
+### Zero-install from this repo (`uvx --from`)
 
 ```bash
-uv sync --extra dev
-export MANAGER_API_URL="http://127.0.0.1:8080/api2"
-export MANAGER_API_KEY="your-token"
-uv run manager-mcp
+uvx --from E:/Development/manager-mcp manager-mcp
 ```
 
-### MCP client config (example)
+Cursor / Claude Desktop / any MCP host — paste into MCP config:
 
 ```json
 {
   "mcpServers": {
     "manager": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/manager-mcp", "manager-mcp"],
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "E:/Development/manager-mcp", "manager-mcp"],
       "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:8080/api2",
+        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
       }
     }
   }
 }
 ```
+
+Optional writes: add `"MANAGER_MCP_ALLOW_WRITES": "1"` under `env`.
+
+### Local editable (dev)
+
+```bash
+uv sync --extra dev
+uv run manager-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "manager": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "E:/Development/manager-mcp", "manager-mcp"],
+      "env": {
+        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
+        "MANAGER_API_KEY": "your-token"
+      }
+    }
+  }
+}
+```
+
+### After publishing to PyPI
+
+```bash
+uvx manager-mcp
+```
+
+```json
+"args": ["manager-mcp"]
+```
+
+`npx` only runs npm packages — skip unless you add a Node wrapper later.
 
 ## Environment
 
