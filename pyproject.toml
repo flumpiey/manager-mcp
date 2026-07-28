@@ -28,6 +28,9 @@ manager-mcp = "manager_mcp.server:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/manager_mcp"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/manager_mcp/assets" = "manager_mcp/assets"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

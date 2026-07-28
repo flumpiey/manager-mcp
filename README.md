@@ -36,6 +36,12 @@ Default is **read-only**. You get:
 
 Transport is **stdio**. No HTTP server. No global install required if you use [`uv`](https://docs.astral.sh/uv/) / `uvx`.
 
+## Branding / icons
+
+- **stdio hosts (Cursor, Claude Desktop via `mcp.json`):** the server advertises Manager branding in MCP `serverInfo.icons` (embedded PNG data URI, plus a GitHub raw HTTPS fallback).
+- **Claude Desktop Extension:** pack [`mcpb/`](mcpb/) (includes `icon.png`) — see Installation → Claude Desktop below.
+- **Claude.ai remote connectors:** Claude.ai ignores `serverInfo.icons` and uses the **root-domain favicon** of the connector URL. If you host a remote MCP later, serve [`docs/favicon.ico`](docs/favicon.ico) at the registrable domain root (e.g. `https://acme.com/favicon.ico` for `https://mcp.acme.com/...`).
+
 ## Requirements
 
 - Python ≥ 3.10 (pulled in automatically by `uvx`)
@@ -119,7 +125,15 @@ Restart Cursor after saving. Confirm the `manager` server shows up under MCP set
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
-Edit the Claude Desktop config, then restart the app.
+**Desktop Extension (`.mcpb`, shows branded icon):** from a clone:
+
+```bash
+npx @anthropic-ai/mcpb pack mcpb
+```
+
+Install the resulting `.mcpb` (double-click, drag onto Claude Desktop, or Settings → Extensions → Install Extension). Enter API URL and key when prompted. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`mcp_config` runs `uvx`).
+
+**Manual `mcp.json` config:** edit the Claude Desktop config, then restart the app.
 
 | OS | Path |
 |----|------|
