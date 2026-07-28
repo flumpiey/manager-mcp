@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,10 @@ class WritableResource:
     tool_stem: str  # create_{stem} / update_{stem} / delete_{stem}
     implemented: bool = False  # tools registered only when True
     create_notes: str = ""
+    # When non-empty, create/update tools validate bodies (banking hardening).
+    known_keys: frozenset[str] = field(default_factory=frozenset)
+    known_line_keys: frozenset[str] = field(default_factory=frozenset)
+    required_keys: frozenset[str] = field(default_factory=frozenset)
 
 
 def _w(
@@ -27,6 +31,9 @@ def _w(
     tool_stem: str | None = None,
     implemented: bool = False,
     create_notes: str = "",
+    known_keys: frozenset[str] | None = None,
+    known_line_keys: frozenset[str] | None = None,
+    required_keys: frozenset[str] | None = None,
 ) -> WritableResource:
     return WritableResource(
         name=name,
@@ -37,6 +44,9 @@ def _w(
         tool_stem=tool_stem or name,
         implemented=implemented,
         create_notes=create_notes,
+        known_keys=known_keys or frozenset(),
+        known_line_keys=known_line_keys or frozenset(),
+        required_keys=required_keys or frozenset(),
     )
 
 
@@ -58,22 +68,94 @@ _QUOTE_PURCHASE_NOTES = (
 )
 
 _BANKING_WORKFLOW = (
-    "Workflow: list_resources (banking in write_scopes) → "
-    "get_record on a similar row as template → create_* → "
-    "get_record(resource, Key) to verify before done. "
-    "Clone Lines from the template; do not invent line keys. "
-    "For FX/foreign amounts, copy rate fields from the template or invoice."
+    "MCP rejects empty bodies and unknown field names before POST. "
+    "Workflow: list_resources → get_record template → create_* → verify warnings. "
+    "Clone Lines from the template. PaidBy must be int. "
+    "FX: Amount on AR lines is base currency; Manager clears USD AR using the "
+    "invoice rate, not receipt ExchangeRate alone — set AR Amount in invoice-rate "
+    "ZAR (or add an explicit FX line) so bank net matches."
 )
 
+_RECEIPT_KNOWN = frozenset(
+    {
+        "AmountsAreTaxExclusive",
+        "CustomFields",
+        "CustomFields2",
+        "CustomThemeId",
+        "Customer",
+        "Date",
+        "Description",
+        "ExchangeRate",
+        "HasLineNumber",
+        "Key",
+        "Lines",
+        "PaidBy",
+        "ProjectEnabled",
+        "ReceivedIn",
+        "Reference",
+        "TaxCodeEnabled",
+        "UniqueName",
+        "id",
+        "text",
+    }
+)
+_RECEIPT_LINE_KNOWN = frozenset(
+    {
+        "Account",
+        "AccountsReceivableCustomer",
+        "AccountsReceivableSalesInvoice",
+        "Amount",
+        "Description",
+        "LineDescription",
+    }
+)
+_RECEIPT_REQUIRED = frozenset({"ReceivedIn", "Customer", "Date", "Lines"})
+
+_PAYMENT_KNOWN = frozenset(
+    {
+        "AmountsAreTaxExclusive",
+        "CustomFields",
+        "CustomFields2",
+        "CustomThemeId",
+        "Date",
+        "Description",
+        "ExchangeRate",
+        "HasLineNumber",
+        "Key",
+        "Lines",
+        "PaidBy",
+        "PaidFrom",
+        "ProjectEnabled",
+        "Reference",
+        "Supplier",
+        "TaxCodeEnabled",
+        "UniqueName",
+        "id",
+        "text",
+    }
+)
+_PAYMENT_LINE_KNOWN = frozenset(
+    {
+        "Account",
+        "AccountsPayableSupplier",
+        "AccountsPayablePurchaseInvoice",
+        "Amount",
+        "Description",
+        "LineDescription",
+    }
+)
+_PAYMENT_REQUIRED = frozenset({"PaidFrom", "Date", "Lines"})
+
 _RECEIPT_NOTES = (
-    "Top-level fields seen live: Customer, Date, Description, ReceivedIn "
-    "(bank/cash account key), PaidBy, Reference, AmountsAreTaxExclusive, Lines. "
+    "Known header keys include ReceivedIn, Customer, Date, PaidBy (int), "
+    "ExchangeRate, Description, Reference, Lines. Line keys include Amount, "
+    "AccountsReceivableCustomer, AccountsReceivableSalesInvoice, Account. "
     + _BANKING_WORKFLOW
 )
 
 _PAYMENT_NOTES = (
-    "Symmetric to receipts: bank side is typically PaidFrom (not ReceivedIn); "
-    "payee/supplier instead of Customer. "
+    "Known header keys include PaidFrom, Supplier, Date, PaidBy (int), "
+    "ExchangeRate, Description, Reference, Lines. "
     + _BANKING_WORKFLOW
 )
 
@@ -235,6 +317,9 @@ WRITABLE: dict[str, WritableResource] = {
         tool_stem="receipt",
         implemented=True,
         create_notes=_RECEIPT_NOTES,
+        known_keys=_RECEIPT_KNOWN,
+        known_line_keys=_RECEIPT_LINE_KNOWN,
+        required_keys=_RECEIPT_REQUIRED,
     ),
     "payments": _w(
         "payments",
@@ -245,6 +330,9 @@ WRITABLE: dict[str, WritableResource] = {
         tool_stem="payment",
         implemented=True,
         create_notes=_PAYMENT_NOTES,
+        known_keys=_PAYMENT_KNOWN,
+        known_line_keys=_PAYMENT_LINE_KNOWN,
+        required_keys=_PAYMENT_REQUIRED,
     ),
     "inter_account_transfers": _w(
         "inter_account_transfers",

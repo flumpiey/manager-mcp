@@ -45,11 +45,15 @@ For any `create_*` / `update_*`:
 
 ## Banking cheat-sheet (`banking` scope)
 
-- Receipts: `Customer`, `Date`, `Description`, `ReceivedIn` (bank account key),
-  `PaidBy`, `Reference`, `Lines`.
-- Payments: bank side is typically `PaidFrom`; payee/supplier instead of Customer.
-- Clone `Lines` from a template — do not invent line keys. Copy FX/rate fields
-  from the template or invoice when clearing foreign currency.
+- MCP **rejects** empty `{}`, unknown names (`BankAccount`, etc.), and non-int
+  `PaidBy` before POST — clone a `get_record` template.
+- Receipts: `ReceivedIn`, `Customer`, `Date`, `PaidBy` (int), `ExchangeRate`,
+  `Lines` with `Amount`, `AccountsReceivableCustomer`,
+  `AccountsReceivableSalesInvoice` (and `Account` for fees/FX).
+- Payments: `PaidFrom`, `Supplier`, `Date`, `Lines` (AP analogues).
+- FX: AR `Amount` is base currency; Manager uses the **invoice** rate to clear
+  USD — set AR in invoice-rate ZAR (or add an FX line), not bank-net alone.
+- After create, check tool `warnings` (persistence diff).
 
 ## Read tools
 

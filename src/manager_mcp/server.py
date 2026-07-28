@@ -14,6 +14,7 @@ from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import WritePolicy
 from manager_mcp.writable import WRITABLE, implemented_for_scope
+from manager_mcp.write_validate import diff_persisted, validate_write_body
 
 _PERIOD_ALIASES = {
     "from_date": "fromDate",
@@ -289,12 +290,35 @@ async def tax_summary(
     return await _fetch_report("tax_summary", from_date=from_date, to_date=to_date)
 
 
+async def _persist_and_verify(
+    resource_name: str,
+    fields: dict[str, Any],
+    body: Any,
+) -> dict[str, Any]:
+    w = WRITABLE[resource_name]
+    result: dict[str, Any] = {"resource": resource_name, "body": body, "warnings": []}
+    if not w.known_keys or not isinstance(body, dict):
+        return result
+    key = body.get("Key") or body.get("key")
+    if not key:
+        result["warnings"] = ["create/update response had no Key; could not verify"]
+        return result
+    persisted = await get_client().get(f"{w.form_path}/{key}")
+    form = persisted if isinstance(persisted, dict) else None
+    result["warnings"] = diff_persisted(w, fields, form)
+    result["verified"] = persisted
+    return result
+
+
 def _make_create_tool(resource_name: str) -> Any:
     w = WRITABLE[resource_name]
     stem = w.tool_stem
 
     async def _create(fields: dict[str, Any]) -> dict[str, Any]:
+        validate_write_body(w, fields, creating=True)
         body = await get_client().post(w.form_path, json=fields)
+        if w.known_keys:
+            return await _persist_and_verify(resource_name, fields, body)
         return {"resource": resource_name, "body": body}
 
     _create.__name__ = f"create_{stem}"
@@ -311,8 +335,13 @@ def _make_update_tool(resource_name: str) -> Any:
     stem = w.tool_stem
 
     async def _update(key: str, fields: dict[str, Any]) -> dict[str, Any]:
+        validate_write_body(w, fields, creating=False)
         path = f"{w.form_path}/{key}"
         body = await get_client().put(path, json=fields)
+        if w.known_keys:
+            out = await _persist_and_verify(resource_name, fields, body or {"Key": key})
+            out["key"] = key
+            return out
         return {"resource": resource_name, "key": key, "body": body}
 
     _update.__name__ = f"update_{stem}"

@@ -1,56 +1,59 @@
 # Research: Scoped writes — banking (receipts / payments)
 
-**Instance**: Malva dev. Top-level receipt fields verified live 2026-07-28
-(`list` + `get` form). Full `Lines[]` key inventory deferred when API was down;
-agents must clone a template via `get_record`.
+**Instance**: Malva dev. Top-level + line keys verified live 2026-07-28
+(template receipt #378 / posted #381 clearing invoice #525).
 
-## Paths (OpenAPI + list GET 200)
+## Paths
 
 | Resource | List | Form |
 |----------|------|------|
 | receipts | `GET /receipts` (`receipts`) | `POST /receipt-form`; `GET/PUT/DELETE /receipt-form/{key}` |
 | payments | `GET /payments` (`payments`) | `POST /payment-form`; `GET/PUT/DELETE /payment-form/{key}` |
 
-No PATCH on forms (same as quotes).
+No PATCH on forms.
 
-## Receipt form — top-level keys (VERIFIED)
+## Receipt header (VERIFIED)
 
-`AmountsAreTaxExclusive`, `Customer`, `Date`, `Description`, `HasLineNumber`,
-`Key`, `Lines`, `PaidBy`, `ReceivedIn`, `Reference`, `TaxCodeEnabled`,
-`UniqueName`, `id`, `text`, plus custom-field / theme / project flags.
+`ReceivedIn` (bank key), `Customer`, `PaidBy` (**int**, e.g. `1`), `ExchangeRate`,
+`Date`, `Description`, `Reference`, `AmountsAreTaxExclusive`, `Lines`, plus
+`Key` / `id` / `text` / theme / custom-field flags on GET clones.
 
-Notable:
+**Not valid:** `BankAccount`, `BankOrCashAccount`, string `PaidBy` — wrong names
+are silently dropped or can 500 upstream. MCP rejects unknowns / bad types
+before POST.
 
-- **`ReceivedIn`** — bank/cash account key (where money landed).
-- **`Customer`** — payer.
-- **`Lines`** — allocation lines (clear invoices / P&amp;L / bank charges).
-- **`Date`**, **`Description`**, **`Reference`**, **`PaidBy`**.
+## Receipt `Lines[]` (VERIFIED)
 
-## Receipt `Lines[]` (TEMPLATE-REQUIRED)
+| Key | Role |
+|-----|------|
+| `Amount` | Base-currency amount (ZAR on Malva books) |
+| `AccountsReceivableCustomer` | Customer key for AR allocation |
+| `AccountsReceivableSalesInvoice` | Invoice key being cleared |
+| `Account` | P&amp;L / bank-charges account (fees, FX) |
 
-Do **not** invent line keys. Workflow:
+## FX behavior (VERIFIED on invoice #525)
 
-1. `list_records` / `get_record` on a similar receipt.
-2. Copy `Lines` shape; swap Account / Amount / invoice links as needed.
-3. Multi-currency / FX: copy any rate or foreign-amount fields from that
-   template (or from the sales invoice being cleared). Manager posts FX to
-   gains/losses when the receipt rate differs from the invoice rate.
+- Manager clears USD AR using the **invoice** exchange rate, not the receipt
+  `ExchangeRate` alone.
+- Setting AR `Amount` to bank net ZAR under-clears USD. Use invoice-rate ZAR
+  for the AR line (e.g. 35,826.042) and an explicit FX line (negative) so bank
+  `ReceivedIn` net matches cash (e.g. 31,012.95).
 
-## Payments (symmetric)
+## Payments
 
-List/form paths verified in OpenAPI path matrix. Expect `PaidFrom` (bank) and
-supplier/payee fields instead of `ReceivedIn`/`Customer`. Same clone-from-
-template rule for `Lines`.
+Symmetric: `PaidFrom` instead of `ReceivedIn`; `Supplier` / AP line keys
+(`AccountsPayableSupplier`, `AccountsPayablePurchaseInvoice`). MCP requires
+`PaidFrom`, `Date`, `Lines` on create.
 
-## Agent workflow (required)
+## MCP hardening
 
-1. `list_resources` → confirm `banking` ∈ `write_scopes`.
-2. `get_record(resource="receipts", key=…)` (or payments) as template.
-3. `create_receipt` / `create_payment` with Manager-native JSON body.
-4. `get_record` on the new `Key` before treating the post as done.
-5. On mistake: `delete_receipt` only if `banking` ∈ `delete_scopes`.
+1. Reject empty body and unknown keys / bad `PaidBy` type before POST.
+2. After create/update, GET form and return `warnings` if fields dropped.
+3. HTTP ≥500 → `ManagerApiError` with retry guidance (template + fix types).
 
-## Denylist
+## Agent workflow
 
-Do not POST bank-or-cash **account** forms, starting balances, reconciliation,
-or COA account forms — client denylist.
+1. `list_resources` → `banking` in scopes.
+2. `get_record` similar receipt as template.
+3. `create_receipt` with known keys only.
+4. Read `warnings` / `verified` in the tool result.

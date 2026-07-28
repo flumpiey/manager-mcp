@@ -22,6 +22,10 @@ class ManagerUnavailableError(RuntimeError):
     """Manager API unreachable (process down, wrong URL, network)."""
 
 
+class ManagerApiError(RuntimeError):
+    """Manager returned an HTTP error (especially 5xx from bad field types)."""
+
+
 class ManagerClient:
     """httpx wrapper. GET always; mutations require WritePolicy authorization."""
 
@@ -115,7 +119,20 @@ class ManagerClient:
                 "Ask the user to open Manager (with API enabled) and retry. "
                 f"Detail: {exc}"
             ) from exc
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            snippet = (exc.response.text or "")[:200]
+            if status >= 500:
+                raise ManagerApiError(
+                    f"Manager HTTP {status} for {method} {url_path}. "
+                    "Usually a bad field name or type (e.g. PaidBy must be int; "
+                    "use ReceivedIn/PaidFrom not BankAccount). "
+                    "get_record a template, fix the body, retry once. "
+                    f"Body: {snippet}"
+                ) from exc
+            raise
         if not response.content:
             return None
         return response.json()
@@ -128,6 +145,7 @@ class ManagerClient:
 __all__ = [
     "BASE_QUERY_KEYS",
     "ConfigError",
+    "ManagerApiError",
     "ManagerClient",
     "ManagerUnavailableError",
     "WRITE_METHODS",
