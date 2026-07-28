@@ -29,7 +29,7 @@ A business owner asks their AI agent which customers have outstanding balances. 
 
 **Acceptance Scenarios**:
 
-1. **Given** a configured Manager.io instance with at least one customer owing money, **When** the user asks which customers have outstanding balances, **Then** the agent returns a summary that includes those customers and amounts consistent with the instance data.
+1. **Given** a configured Manager.io instance with at least one customer owing money, **When** the user asks which customers have outstanding balances, **Then** the agent returns those customers and amounts as present in the Manager read response for that view (same keys/amounts; offline: equal to the mocked GET body).
 2. **Given** a configured instance with no outstanding receivables, **When** the user asks the same question, **Then** the agent reports that no customers currently owe money (or an equivalent empty result), not an error.
 3. **Given** any configured instance, **When** the user or agent inspects available capabilities, **Then** no create, edit, post, or delete capability is present.
 
@@ -41,12 +41,12 @@ The same user asks for aged payables, bank/cash balances, trial balance, profit 
 
 **Why this priority**: Completes the “ask about my books” value set without needing writes or saved-report setup.
 
-**Independent Test**: For each named view, request it via the agent against a configured instance and confirm figures are consistent with Manager and that no mutation path exists.
+**Independent Test**: For each named view, request it via the agent against a configured instance and confirm figures match the Manager GET body for that path (same keys/amounts; offline: mocked equality) and that no mutation path exists.
 
 **Acceptance Scenarios**:
 
-1. **Given** a configured instance with supplier obligations, **When** the user asks about aged payables (who is owed / aging), **Then** the agent returns a summary consistent with the instance.
-2. **Given** a configured instance with bank or cash accounts, **When** the user asks for bank/cash balances, **Then** the agent returns balances consistent with the instance.
+1. **Given** a configured instance with supplier obligations, **When** the user asks about aged payables (who is owed / aging), **Then** the agent returns amounts as present in the Manager read response for that view (offline: equal to the mocked GET body).
+2. **Given** a configured instance with bank or cash accounts, **When** the user asks for bank/cash balances, **Then** the agent returns balances as present in the Manager read response for that view (offline: equal to the mocked GET body).
 3. **Given** a configured instance with posted activity, **When** the user asks for trial balance, profit & loss, balance sheet, or tax summary, **Then** the agent returns the corresponding read-only snapshot (or a clear error if that view is unavailable on the instance), without requiring a pre-saved report identifier from the user.
 4. **Given** a snapshot view whose live endpoint accepts a date or period parameter, **When** the user asks for that view for a specific date or period, **Then** the agent returns data for that date/period.
 5. **Given** a snapshot view whose live endpoint does not accept a date or period parameter, **When** the user asks for a historical or custom period, **Then** the agent returns the current/default view and clearly states that date/period selection is not available for that view in v1.
@@ -139,7 +139,7 @@ opt-in clause and is intentional for this release.
 - **FR-002**: The system MUST obtain `MANAGER_API_URL` (opaque instance base URL) and `MANAGER_API_KEY` (access token) only from environment configuration; credentials MUST NOT be hard-coded or written into logs or tool responses. The URL already scopes which books are read (including any `/api2` suffix or business path segment the deployment requires); v1 MUST NOT require a separate business-identifier setting.
 - **FR-003**: The system MUST reject startup or configuration when required environment values (base URL and access token) are missing or invalid, with an actionable error message.
 - **FR-004**: The system MUST NOT expose any capability that creates, edits, posts, or deletes data in Manager.io.
-- **FR-005**: The system MUST fail loudly (hard error) if configuration attempts to enable write/mutation capabilities; it MUST NOT silently ignore a write flag and continue read-only. In v1 this means: (a) refuse to start when any known write-related env key is set — canonical name aligned with `plan.md` (expected `MANAGER_MCP_ALLOW_WRITES`) and documented near-miss variants (`ALLOW_WRITES`, `MANAGER_MCP_WRITES`) so typos fail loudly rather than being ignored; (b) keep a lasting regression check that the registered tool set contains no create/update/delete (or equivalent mutating) tools.
+- **FR-005**: The system MUST fail loudly (hard error) if configuration attempts to enable write/mutation capabilities; it MUST NOT silently ignore a write flag and continue read-only. In v1 this means: (a) refuse to start when any known write-related env key is set — canonical `MANAGER_MCP_ALLOW_WRITES` and near-miss variants `ALLOW_WRITES`, `MANAGER_MCP_WRITES` — if the trimmed value is non-empty. Explicit truthy set (case-insensitive): `1`, `true`, `yes`, `on`; any other non-empty value also fails closed; empty/unset → allow start; (b) keep a lasting regression check that the registered tool set contains no create/update/delete (or equivalent mutating) tools.
 - **FR-006**: The system MUST provide a discovery capability that lists supported read operations and states the read-only boundary.
 - **FR-007**: The system MUST support read access for outstanding customer balances / receivables-oriented answers.
 - **FR-008**: The system MUST support read access for aged payables, bank/cash balances, trial balance, profit & loss, balance sheet, and tax summary without requiring the user to supply a saved-report GUID.
@@ -168,13 +168,13 @@ opt-in clause and is intentional for this release.
 ### Measurable Outcomes
 
 - **SC-001**: A user can configure the server with only an instance URL and access token and, from their MCP client, complete User Story 1 (outstanding customer balances) without any mutating capability available in the tool list.
-- **SC-002**: For each of aged payables, bank/cash balances, trial balance, profit & loss, balance sheet, and tax summary, a user can obtain an answer consistent with their Manager books in a single agent session, or receive a clear unsupported/unavailable message — never a silent wrong success.
+- **SC-002**: For each of aged payables, bank/cash balances, trial balance, profit & loss, balance sheet, and tax summary, a user can obtain an answer whose figures match the Manager GET body for that view (same keys/amounts; offline: mocked equality) in a single agent session, or receive a clear unsupported/unavailable message — never a silent wrong success.
 - **SC-008**: When a user requests a period-specific snapshot for a view that lacks live date/period query support, the response still returns current/default data and explicitly discloses that period selection is unavailable (never silently implies the period was applied).
 - **SC-003**: Discovery returns a complete list of supported read capabilities in one request, and 100% of listed capabilities are non-mutating.
 - **SC-004**: When a collection has more matches than one page, the agent is informed that results are truncated or that another page is available in 100% of such responses.
 - **SC-005**: Setting a known write-related env var (canonical or near-miss variant) causes startup to fail with an explicit error in 100% of cases; additionally, automated verification confirms the registered tool set contains zero mutating (create/update/delete) tools.
 - **SC-006**: The companion Agent Skill is installable from the project’s skill packaging and its description visibly states Manager.io/bookkeeping relevance and the read-only boundary.
-- **SC-007**: A reviewer can confirm the exposed capability count stays small and curated (on the order of ~10 tools), not a wholesale mirror of the Manager API; bank balances snapshot plus bank accounts collection counts as two intentional capabilities, not a defect.
+- **SC-007**: A reviewer can confirm the exposed capability count stays small and curated: discovery (`list_resources`) + `list_records` + `get_record` + seven report shortcuts ≈ 10 tools (`contracts/mcp-tools.md`), not a wholesale mirror of the Manager API; bank balances snapshot plus bank accounts collection counts as two intentional capabilities, not a defect.
 
 ## Assumptions
 

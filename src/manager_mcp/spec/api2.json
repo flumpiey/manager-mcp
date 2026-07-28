@@ -1,0 +1,2125 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Manager.io API2 (curated provenance)",
+    "description": "Subset of live OpenAPI for allowlist provenance. Runtime does not load this file.",
+    "version": "live-validated"
+  },
+  "paths": {
+    "/customers": {
+      "get": {
+        "operationId": "GetCustomers",
+        "summary": "Customers",
+        "description": "Retrieve list of customers. For more information, see https://www.manager.io/guides?customers",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Image",
+                "Attachment",
+                "Code",
+                "Name",
+                "EmailAddress",
+                "ControlAccount",
+                "Division",
+                "BillingAddress",
+                "DeliveryAddress",
+                "Receipts",
+                "Payments",
+                "SalesQuotes",
+                "SalesOrders",
+                "SalesInvoices",
+                "CreditNotes",
+                "DeliveryNotes",
+                "QtyToDeliver",
+                "Uninvoiced",
+                "AccountsReceivable",
+                "WithholdingTaxReceivable",
+                "Status",
+                "AvailableCredit",
+                "Timestamp"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Image",
+                  "Attachment",
+                  "Code",
+                  "Name",
+                  "EmailAddress",
+                  "ControlAccount",
+                  "Division",
+                  "BillingAddress",
+                  "DeliveryAddress",
+                  "Receipts",
+                  "Payments",
+                  "SalesQuotes",
+                  "SalesOrders",
+                  "SalesInvoices",
+                  "CreditNotes",
+                  "DeliveryNotes",
+                  "QtyToDeliver",
+                  "Uninvoiced",
+                  "AccountsReceivable",
+                  "WithholdingTaxReceivable",
+                  "Status",
+                  "AvailableCredit",
+                  "Timestamp"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/customer-form": {
+      "post": {
+        "operationId": "PostCustomerForm",
+        "summary": "CustomerForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/customer-form/{key}": {
+      "get": {
+        "operationId": "GetCustomerForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteCustomerForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutCustomerForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/suppliers": {
+      "get": {
+        "operationId": "GetSuppliers",
+        "summary": "Suppliers",
+        "description": "Retrieve list of suppliers. For more information, see https://www.manager.io/guides?suppliers",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Image",
+                "Attachment",
+                "Code",
+                "Name",
+                "EmailAddress",
+                "ControlAccount",
+                "Division",
+                "Address",
+                "Receipts",
+                "Payments",
+                "PurchaseQuotes",
+                "PurchaseOrders",
+                "PurchaseInvoices",
+                "DebitNotes",
+                "GoodsReceipts",
+                "QtyToReceive",
+                "AccountsPayable",
+                "WithholdingTaxPayable",
+                "Status",
+                "AvailableCredit",
+                "Timestamp"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Image",
+                  "Attachment",
+                  "Code",
+                  "Name",
+                  "EmailAddress",
+                  "ControlAccount",
+                  "Division",
+                  "Address",
+                  "Receipts",
+                  "Payments",
+                  "PurchaseQuotes",
+                  "PurchaseOrders",
+                  "PurchaseInvoices",
+                  "DebitNotes",
+                  "GoodsReceipts",
+                  "QtyToReceive",
+                  "AccountsPayable",
+                  "WithholdingTaxPayable",
+                  "Status",
+                  "AvailableCredit",
+                  "Timestamp"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/supplier-form": {
+      "post": {
+        "operationId": "PostSupplierForm",
+        "summary": "SupplierForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/supplier-form/{key}": {
+      "get": {
+        "operationId": "GetSupplierForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteSupplierForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutSupplierForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/sales-invoices": {
+      "get": {
+        "operationId": "GetSalesInvoices",
+        "summary": "Sales Invoices",
+        "description": "Retrieve list of sales invoices. For more information, see https://www.manager.io/guides?sales-invoices",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Image",
+                "Attachment",
+                "IssueDate",
+                "DueDate",
+                "Reference",
+                "SalesQuote",
+                "SalesOrder",
+                "Customer",
+                "Description",
+                "Project",
+                "Division",
+                "ClosedInvoice",
+                "WithholdingTax",
+                "Discount",
+                "InvoiceAmount",
+                "CostOfSales",
+                "BalanceDue",
+                "DaysToDueDate",
+                "DaysOverdue",
+                "Status",
+                "Timestamp"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Image",
+                  "Attachment",
+                  "IssueDate",
+                  "DueDate",
+                  "Reference",
+                  "SalesQuote",
+                  "SalesOrder",
+                  "Customer",
+                  "Description",
+                  "Project",
+                  "Division",
+                  "ClosedInvoice",
+                  "WithholdingTax",
+                  "Discount",
+                  "InvoiceAmount",
+                  "CostOfSales",
+                  "BalanceDue",
+                  "DaysToDueDate",
+                  "DaysOverdue",
+                  "Status",
+                  "Timestamp"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/sales-invoice-form": {
+      "post": {
+        "operationId": "PostSalesInvoiceForm",
+        "summary": "SalesInvoiceForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/sales-invoice-form/{key}": {
+      "get": {
+        "operationId": "GetSalesInvoiceForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteSalesInvoiceForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutSalesInvoiceForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/purchase-invoices": {
+      "get": {
+        "operationId": "GetPurchaseInvoices",
+        "summary": "Purchase Invoices",
+        "description": "Retrieve list of purchase invoices. For more information, see https://www.manager.io/guides?purchase-invoices",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Image",
+                "Attachment",
+                "IssueDate",
+                "DueDate",
+                "Reference",
+                "PurchaseOrder",
+                "Supplier",
+                "Description",
+                "Project",
+                "ClosedInvoice",
+                "WithholdingTax",
+                "Discount",
+                "InvoiceAmount",
+                "BalanceDue",
+                "DaysToDueDate",
+                "DaysOverdue",
+                "Status",
+                "Timestamp"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Image",
+                  "Attachment",
+                  "IssueDate",
+                  "DueDate",
+                  "Reference",
+                  "PurchaseOrder",
+                  "Supplier",
+                  "Description",
+                  "Project",
+                  "ClosedInvoice",
+                  "WithholdingTax",
+                  "Discount",
+                  "InvoiceAmount",
+                  "BalanceDue",
+                  "DaysToDueDate",
+                  "DaysOverdue",
+                  "Status",
+                  "Timestamp"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/purchase-invoice-form": {
+      "post": {
+        "operationId": "PostPurchaseInvoiceForm",
+        "summary": "PurchaseInvoiceForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/purchase-invoice-form/{key}": {
+      "get": {
+        "operationId": "GetPurchaseInvoiceForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeletePurchaseInvoiceForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutPurchaseInvoiceForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/chart-of-accounts": {
+      "get": {
+        "operationId": "GetChartOfAccounts",
+        "summary": "Chart of Accounts",
+        "description": "Retrieve list of chart of accounts. For more information, see https://www.manager.io/guides?chart-of-accounts",
+        "parameters": [
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Key",
+                  "Code",
+                  "Name"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/bank-and-cash-accounts": {
+      "get": {
+        "operationId": "GetBankAndCashAccounts",
+        "summary": "Bank and Cash Accounts",
+        "description": "Retrieve list of bank and cash accounts. For more information, see https://www.manager.io/guides?bank-and-cash-accounts",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Image",
+                "Attachment",
+                "Code",
+                "Name",
+                "ControlAccount",
+                "Division",
+                "UncategorizedReceipts",
+                "UncategorizedPayments",
+                "ClearedBalance",
+                "PendingDeposits",
+                "PendingWithdrawals",
+                "ActualBalance",
+                "AvailableCredit",
+                "LastBankReconciliation",
+                "Timestamp"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Image",
+                  "Attachment",
+                  "Code",
+                  "Name",
+                  "ControlAccount",
+                  "Division",
+                  "UncategorizedReceipts",
+                  "UncategorizedPayments",
+                  "ClearedBalance",
+                  "PendingDeposits",
+                  "PendingWithdrawals",
+                  "ActualBalance",
+                  "AvailableCredit",
+                  "LastBankReconciliation",
+                  "Timestamp"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/bank-or-cash-account-form": {
+      "post": {
+        "operationId": "PostBankOrCashAccountForm",
+        "summary": "BankOrCashAccountForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/bank-or-cash-account-form/{key}": {
+      "get": {
+        "operationId": "GetBankOrCashAccountForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteBankOrCashAccountForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutBankOrCashAccountForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/trial-balance-transactions": {
+      "get": {
+        "operationId": "GetTrialBalanceTransactions",
+        "summary": "TrialBalanceTransactions",
+        "description": "Retrieve list of trialbalancetransactions. For more information, see https://www.manager.io/guides?trial-balance-transactions",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Name",
+                "BaseBalance",
+                "AccountBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "Investment",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "Name",
+                "Qty",
+                "MarketValue",
+                "Investment",
+                "Qty",
+                "MarketValue",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryItem",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "InventoryItem",
+                "Qty",
+                "Balance",
+                "Name",
+                "QtyOwned",
+                "TotalCost",
+                "Name",
+                "Balance",
+                "Date",
+                "Transaction",
+                "ConversionMarkup",
+                "Debit",
+                "Credit",
+                "Account",
+                "ForeignBalance",
+                "ConvertedBalance",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "Account",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryKit",
+                "InventoryItem",
+                "Investment",
+                "FixedAsset",
+                "IntangibleAsset",
+                "CapitalAccount",
+                "SpecialAccount",
+                "Description",
+                "Tax",
+                "Qty",
+                "PurchaseCost",
+                "UnitCost",
+                "TransactionAmount",
+                "CurrencyAmount",
+                "Debit",
+                "Credit"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Name",
+                  "BaseBalance",
+                  "AccountBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "Investment",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "Qty",
+                  "MarketValue",
+                  "Investment",
+                  "Qty",
+                  "MarketValue",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryItem",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "InventoryItem",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "QtyOwned",
+                  "TotalCost",
+                  "Name",
+                  "Balance",
+                  "Date",
+                  "Transaction",
+                  "ConversionMarkup",
+                  "Debit",
+                  "Credit",
+                  "Account",
+                  "ForeignBalance",
+                  "ConvertedBalance",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "Account",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryKit",
+                  "InventoryItem",
+                  "Investment",
+                  "FixedAsset",
+                  "IntangibleAsset",
+                  "CapitalAccount",
+                  "SpecialAccount",
+                  "Description",
+                  "Tax",
+                  "Qty",
+                  "PurchaseCost",
+                  "UnitCost",
+                  "TransactionAmount",
+                  "CurrencyAmount",
+                  "Debit",
+                  "Credit"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/profit-and-loss-statement-transactions": {
+      "get": {
+        "operationId": "GetProfitAndLossStatementTransactions",
+        "summary": "ProfitAndLossStatementTransactions",
+        "description": "Retrieve list of profitandlossstatementtransactions. For more information, see https://www.manager.io/guides?profit-and-loss-statement-transactions",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Name",
+                "BaseBalance",
+                "AccountBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "Investment",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "Name",
+                "Qty",
+                "MarketValue",
+                "Investment",
+                "Qty",
+                "MarketValue",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryItem",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "InventoryItem",
+                "Qty",
+                "Balance",
+                "Name",
+                "QtyOwned",
+                "TotalCost",
+                "Name",
+                "Balance",
+                "Date",
+                "Transaction",
+                "ConversionMarkup",
+                "Debit",
+                "Credit",
+                "Account",
+                "ForeignBalance",
+                "ConvertedBalance",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "Account",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryKit",
+                "InventoryItem",
+                "Investment",
+                "FixedAsset",
+                "IntangibleAsset",
+                "CapitalAccount",
+                "SpecialAccount",
+                "Description",
+                "Tax",
+                "Qty",
+                "PurchaseCost",
+                "UnitCost",
+                "TransactionAmount",
+                "CurrencyAmount",
+                "Debit",
+                "Credit"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Name",
+                  "BaseBalance",
+                  "AccountBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "Investment",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "Qty",
+                  "MarketValue",
+                  "Investment",
+                  "Qty",
+                  "MarketValue",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryItem",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "InventoryItem",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "QtyOwned",
+                  "TotalCost",
+                  "Name",
+                  "Balance",
+                  "Date",
+                  "Transaction",
+                  "ConversionMarkup",
+                  "Debit",
+                  "Credit",
+                  "Account",
+                  "ForeignBalance",
+                  "ConvertedBalance",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "Account",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryKit",
+                  "InventoryItem",
+                  "Investment",
+                  "FixedAsset",
+                  "IntangibleAsset",
+                  "CapitalAccount",
+                  "SpecialAccount",
+                  "Description",
+                  "Tax",
+                  "Qty",
+                  "PurchaseCost",
+                  "UnitCost",
+                  "TransactionAmount",
+                  "CurrencyAmount",
+                  "Debit",
+                  "Credit"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/balance-sheet-transactions": {
+      "get": {
+        "operationId": "GetBalanceSheetTransactions",
+        "summary": "BalanceSheetTransactions",
+        "description": "Retrieve list of balancesheettransactions. For more information, see https://www.manager.io/guides?balance-sheet-transactions",
+        "parameters": [
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Name",
+                "BaseBalance",
+                "AccountBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "Investment",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "Name",
+                "Qty",
+                "MarketValue",
+                "Investment",
+                "Qty",
+                "MarketValue",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryItem",
+                "CapitalAccount",
+                "Description",
+                "Qty",
+                "Balance",
+                "InventoryItem",
+                "Qty",
+                "Balance",
+                "Name",
+                "QtyOwned",
+                "TotalCost",
+                "Name",
+                "Balance",
+                "Date",
+                "Transaction",
+                "ConversionMarkup",
+                "Debit",
+                "Credit",
+                "Account",
+                "ForeignBalance",
+                "ConvertedBalance",
+                "ClosingBalance",
+                "Date",
+                "Transaction",
+                "Account",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryKit",
+                "InventoryItem",
+                "Investment",
+                "FixedAsset",
+                "IntangibleAsset",
+                "CapitalAccount",
+                "SpecialAccount",
+                "Description",
+                "Tax",
+                "Qty",
+                "PurchaseCost",
+                "UnitCost",
+                "TransactionAmount",
+                "CurrencyAmount",
+                "Debit",
+                "Credit"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Name",
+                  "BaseBalance",
+                  "AccountBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "Investment",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "Qty",
+                  "MarketValue",
+                  "Investment",
+                  "Qty",
+                  "MarketValue",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryItem",
+                  "CapitalAccount",
+                  "Description",
+                  "Qty",
+                  "Balance",
+                  "InventoryItem",
+                  "Qty",
+                  "Balance",
+                  "Name",
+                  "QtyOwned",
+                  "TotalCost",
+                  "Name",
+                  "Balance",
+                  "Date",
+                  "Transaction",
+                  "ConversionMarkup",
+                  "Debit",
+                  "Credit",
+                  "Account",
+                  "ForeignBalance",
+                  "ConvertedBalance",
+                  "ClosingBalance",
+                  "Date",
+                  "Transaction",
+                  "Account",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryKit",
+                  "InventoryItem",
+                  "Investment",
+                  "FixedAsset",
+                  "IntangibleAsset",
+                  "CapitalAccount",
+                  "SpecialAccount",
+                  "Description",
+                  "Tax",
+                  "Qty",
+                  "PurchaseCost",
+                  "UnitCost",
+                  "TransactionAmount",
+                  "CurrencyAmount",
+                  "Debit",
+                  "Credit"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/tax-summary-transactions": {
+      "get": {
+        "operationId": "GetTaxSummaryTransactions",
+        "summary": "TaxSummaryTransactions",
+        "description": "Retrieve list of taxsummarytransactions. For more information, see https://www.manager.io/guides?tax-summary-transactions",
+        "parameters": [
+          {
+            "name": "term",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortByDesc",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Name",
+                "Balance",
+                "Date",
+                "Transaction",
+                "Account",
+                "BankOrCashAccount",
+                "ExpenseClaimPayer",
+                "Customer",
+                "Supplier",
+                "Employee",
+                "InventoryKit",
+                "InventoryItem",
+                "Investment",
+                "FixedAsset",
+                "IntangibleAsset",
+                "CapitalAccount",
+                "SpecialAccount",
+                "Description",
+                "Tax",
+                "Qty",
+                "PurchaseCost",
+                "TransactionAmount",
+                "CurrencyAmount",
+                "Debit",
+                "Credit",
+                "Name",
+                "BaseBalance",
+                "AccountBalance",
+                "Investment",
+                "Qty",
+                "MarketPrice",
+                "MarketValue",
+                "AverageCost",
+                "TotalCost",
+                "OpeningUnrealizedGainsLosses",
+                "IncrementsOrDecrementsForThePeriod",
+                "ClosingUnrealizedGainsLosses",
+                "Account",
+                "ForeignBalance",
+                "AdjustedBalance",
+                "CurrentBalance"
+              ]
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "fields",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Name",
+                  "Balance",
+                  "Date",
+                  "Transaction",
+                  "Account",
+                  "BankOrCashAccount",
+                  "ExpenseClaimPayer",
+                  "Customer",
+                  "Supplier",
+                  "Employee",
+                  "InventoryKit",
+                  "InventoryItem",
+                  "Investment",
+                  "FixedAsset",
+                  "IntangibleAsset",
+                  "CapitalAccount",
+                  "SpecialAccount",
+                  "Description",
+                  "Tax",
+                  "Qty",
+                  "PurchaseCost",
+                  "TransactionAmount",
+                  "CurrencyAmount",
+                  "Debit",
+                  "Credit",
+                  "Name",
+                  "BaseBalance",
+                  "AccountBalance",
+                  "Investment",
+                  "Qty",
+                  "MarketPrice",
+                  "MarketValue",
+                  "AverageCost",
+                  "TotalCost",
+                  "OpeningUnrealizedGainsLosses",
+                  "IncrementsOrDecrementsForThePeriod",
+                  "ClosingUnrealizedGainsLosses",
+                  "Account",
+                  "ForeignBalance",
+                  "AdjustedBalance",
+                  "CurrentBalance"
+                ]
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/aged-receivables-form": {
+      "post": {
+        "operationId": "PostAgedReceivablesForm",
+        "summary": "AgedReceivablesForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/aged-receivables-form/{key}": {
+      "get": {
+        "operationId": "GetAgedReceivablesForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteAgedReceivablesForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutAgedReceivablesForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/aged-payables-form": {
+      "post": {
+        "operationId": "PostAgedPayablesForm",
+        "summary": "AgedPayablesForm",
+        "description": "Create a new resource",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created"
+          }
+        }
+      }
+    },
+    "/aged-payables-form/{key}": {
+      "get": {
+        "operationId": "GetAgedPayablesForm",
+        "summary": "Get a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "DeleteAgedPayablesForm",
+        "summary": "Delete a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "put": {
+        "operationId": "PutAgedPayablesForm",
+        "summary": "Put a resource by Key",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}
