@@ -344,6 +344,33 @@ WRITABLE: dict[str, WritableResource] = {
         implemented=True,
         create_notes=_DEFAULT_NOTES,
     ),
+    "bank_accounts": _w(
+        "bank_accounts",
+        "banking",
+        "/bank-or-cash-account-form",
+        "/bank-and-cash-accounts",
+        "bankAndCashAccounts",
+        tool_stem="bank_account",
+        implemented=True,
+        create_notes=(
+            "Create a Bank/Cash account (e.g. Customer deposits). "
+            "Required: Name. Clone get_record on bank_accounts when unsure. "
+            "Used as ReceivedIn for deposit receipts."
+        ),
+        known_keys=frozenset(
+            {
+                "Name",
+                "Currency",
+                "Key",
+                "id",
+                "text",
+                "UniqueName",
+                "CustomFields",
+                "CustomFields2",
+            }
+        ),
+        required_keys=frozenset({"Name"}),
+    ),
     # payroll
     "employees": _w(
         "employees",

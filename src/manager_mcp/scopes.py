@@ -54,6 +54,7 @@ RESOURCE_SCOPE: dict[str, str] = {
     "receipts": "banking",
     "payments": "banking",
     "inter_account_transfers": "banking",
+    "bank_accounts": "banking",
     # payroll
     "employees": "payroll",
     "payslips": "payroll",
@@ -84,6 +85,7 @@ PATH_TO_RESOURCE: dict[str, str] = {
     "/receipt-form": "receipts",
     "/payment-form": "payments",
     "/inter-account-transfer-form": "inter_account_transfers",
+    "/bank-or-cash-account-form": "bank_accounts",
     "/employee-form": "employees",
     "/payslip-form": "payslips",
     "/expense-claim-form": "expense_claims",
@@ -123,7 +125,8 @@ _DENY_REGEX = tuple(
         r"^/balance-sheet-.*-account-form",
         r"^/control-account-for-.*-form",
         r"^/profit-and-loss-statement-account-.*-form",
-        r"^/.*-account-form$",  # catch-all account forms (COA)
+        # COA-style account forms; bank-or-cash is a bank account (allowed when scoped)
+        r"^/(?!bank-or-cash-)[^/]*-account-form$",
     )
 )
 

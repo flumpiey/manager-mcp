@@ -53,6 +53,9 @@ def test_denylist_access_token() -> None:
 def test_denylist_account_forms() -> None:
     assert is_denylisted("/balance-sheet-cash-at-bank-account-form")
     assert is_denylisted("/control-account-for-customers-form")
+    # Bank/cash accounts are writable under banking scope (deposit setup).
+    assert not is_denylisted("/bank-or-cash-account-form")
+    assert not is_denylisted("/bank-or-cash-account-form/abc")
 
 
 def test_unmapped_path_denied() -> None:
