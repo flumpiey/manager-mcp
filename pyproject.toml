@@ -8,11 +8,31 @@ version = "0.1.0"
 description = "Read-only MCP server for Manager.io bookkeeping"
 readme = "README.md"
 license = "MIT"
+authors = [{ name = "Dru Connold" }]
 requires-python = ">=3.10"
+keywords = [
+  "mcp",
+  "model-context-protocol",
+  "manager.io",
+  "accounting",
+  "fastmcp",
+  "bookkeeping",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Office/Business :: Financial :: Accounting",
+]
 dependencies = [
   "fastmcp>=2.0",
   "httpx",
 ]
+
+[project.urls]
+Homepage = "https://github.com/flumpiey/manager-mcp"
+Repository = "https://github.com/flumpiey/manager-mcp"
+Issues = "https://github.com/flumpiey/manager-mcp/issues"
 
 [project.optional-dependencies]
 dev = [

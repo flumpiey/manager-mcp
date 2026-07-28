@@ -53,7 +53,11 @@ Create an access token in Manager under **Settings → Access Tokens**. The serv
 
 ## Quick start
 
-Zero-install from GitHub:
+```bash
+uvx manager-mcp
+```
+
+From source (GitHub):
 
 ```bash
 uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp
@@ -354,13 +358,14 @@ Any host that can spawn a stdio MCP server:
 | Args | `--from git+https://github.com/flumpiey/manager-mcp manager-mcp` |
 | Env | `MANAGER_API_URL`, `MANAGER_API_KEY` (+ optional write scopes) |
 
-Dev variant: `uv run --directory /path/to/manager-mcp manager-mcp`.
-
-After publishing to PyPI:
+Recommended install (PyPI):
 
 ```bash
 uvx manager-mcp
 ```
+
+From source: `uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp`.
+Dev variant: `uv run --directory /path/to/manager-mcp manager-mcp`.
 
 `npx` only runs npm packages — this is a Python package; use `uvx`.
 
