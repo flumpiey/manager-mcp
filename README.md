@@ -39,6 +39,7 @@ Transport is **stdio**. No HTTP server. No global install required if you use [`
 ## Branding / icons
 
 - **stdio hosts (Cursor, Claude Desktop via `mcp.json`):** the server advertises Manager branding in MCP `serverInfo.icons` (embedded PNG data URI, plus a GitHub raw HTTPS fallback).
+- **Cursor plugin:** [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) uses [`docs/manager-icon.svg`](docs/manager-icon.svg).
 - **Claude Desktop Extension:** pack [`mcpb/`](mcpb/) (includes `icon.png`) — see Installation → Claude Desktop below.
 - **Claude.ai remote connectors:** Claude.ai ignores `serverInfo.icons` and uses the **root-domain favicon** of the connector URL. If you host a remote MCP later, serve [`docs/favicon.ico`](docs/favicon.ico) at the registrable domain root (e.g. `https://acme.com/favicon.ico` for `https://mcp.acme.com/...`).
 
@@ -73,9 +74,18 @@ Replace `/path/to/manager-mcp` with your clone path (or use the `git+https://…
 <details>
 <summary><strong>Cursor</strong></summary>
 
-Project config: [`.cursor/mcp.json`](.cursor/mcp.json). User-wide: `~/.cursor/mcp.json`.
+**Plugin (Configure UI for URL, key, and scopes):** this repo is a Cursor plugin via [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) + root [`mcp.json`](mcp.json).
 
-**Zero-install (`uvx --from`):**
+1. Symlink or copy the clone to `~/.cursor/plugins/local/manager-mcp` (Windows: `%USERPROFILE%\.cursor\plugins\local\manager-mcp`).
+2. Reload the window.
+3. Open **Plugins → Configure** on `manager-mcp`. Set **Manager API URL** and **Manager API key**. Leave **Write scopes** / **Delete scopes** empty for read-only, or paste a CSV such as `quotes` or `quotes,orders`.
+4. Confirm the `manager` MCP server is enabled under Customize / MCP.
+
+Marketplace listing is a separate submit at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
+
+**Manual `mcp.json`:** project [`.cursor/mcp.json`](.cursor/mcp.json) or user-wide `~/.cursor/mcp.json`.
+
+Zero-install:
 
 ```json
 {
@@ -93,7 +103,7 @@ Project config: [`.cursor/mcp.json`](.cursor/mcp.json). User-wide: `~/.cursor/mc
 }
 ```
 
-**Local editable (dev):**
+Local editable (dev):
 
 ```json
 {
@@ -111,14 +121,14 @@ Project config: [`.cursor/mcp.json`](.cursor/mcp.json). User-wide: `~/.cursor/mc
 }
 ```
 
-Optional scoped writes:
+Optional scoped writes in the `env` block:
 
 ```json
 "MANAGER_MCP_WRITE_SCOPES": "quotes",
 "MANAGER_MCP_DELETE_SCOPES": "quotes"
 ```
 
-Restart Cursor after saving. Confirm the `manager` server shows up under MCP settings.
+Restart Cursor after saving. Confirm `manager` under MCP settings.
 
 </details>
 
@@ -131,7 +141,7 @@ Restart Cursor after saving. Confirm the `manager` server shows up under MCP set
 npx @anthropic-ai/mcpb pack mcpb
 ```
 
-Install the resulting `.mcpb` (double-click, drag onto Claude Desktop, or Settings → Extensions → Install Extension). Enter API URL and key when prompted. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`mcp_config` runs `uvx`).
+Install the resulting `.mcpb` (double-click, drag onto Claude Desktop, or Settings → Extensions → Install Extension). Enter API URL and key when prompted; leave write/delete scopes empty for read-only. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`mcp_config` runs `uvx`).
 
 **Manual `mcp.json` config:** edit the Claude Desktop config, then restart the app.
 
@@ -270,6 +280,70 @@ Restart Windsurf after saving.
 </details>
 
 <details>
+<summary><strong>Zed</strong></summary>
+
+Add under `context_servers` in Zed `settings.json` (Agent Panel → settings also works):
+
+```json
+{
+  "context_servers": {
+    "manager": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "env": {
+        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
+        "MANAGER_API_KEY": "your-token"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Cline</strong></summary>
+
+Edit the Cline MCP settings file (`cline_mcp_settings.json` via the Cline MCP UI):
+
+```json
+{
+  "mcpServers": {
+    "manager": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "env": {
+        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
+        "MANAGER_API_KEY": "your-token"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><strong>Continue</strong></summary>
+
+In `.continue/config.yaml`:
+
+```yaml
+mcpServers:
+  - name: manager
+    command: uvx
+    args:
+      - --from
+      - git+https://github.com/flumpiey/manager-mcp
+      - manager-mcp
+    env:
+      MANAGER_API_URL: http://127.0.0.1:55667/api2
+      MANAGER_API_KEY: your-token
+```
+
+</details>
+
+<details>
 <summary><strong>Generic / any stdio MCP host</strong></summary>
 
 Any host that can spawn a stdio MCP server:
@@ -371,7 +445,7 @@ Registered only for resources in enabled scopes. Pattern:
 
 Companion skill: [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md).
 
-In Cursor, copy or symlink that folder into your agent skills path (or keep it under this repo’s `skills/`). It tells the model to call `list_resources` first, verify after writes, and which report tools to prefer.
+The Cursor plugin discovers this skill from `skills/`. Without the plugin, copy or symlink that folder into your agent skills path. It tells the model to call `list_resources` first, verify after writes, and which report tools to prefer.
 
 ## Development
 
@@ -394,6 +468,7 @@ GitHub Actions matrix: Python 3.10 and 3.12.
 - One process ↔ one `MANAGER_API_URL`. Multi-instance routing is out of scope.
 - Multi-business disambiguation on a shared host is **unverified** — do not claim multi-business support until validated against a live multi-business setup.
 - Vendored `src/manager_mcp/spec/api2.json` is provenance only; runtime always hits the live URL.
+- ChatGPT Apps need a hosted HTTP MCP endpoint. This package is stdio-only.
 
 ## License
 

@@ -23,7 +23,9 @@
       ],
       "env": {
         "MANAGER_API_URL": "${user_config.api_url}",
-        "MANAGER_API_KEY": "${user_config.api_key}"
+        "MANAGER_API_KEY": "${user_config.api_key}",
+        "MANAGER_MCP_WRITE_SCOPES": "${user_config.write_scopes}",
+        "MANAGER_MCP_DELETE_SCOPES": "${user_config.delete_scopes}"
       }
     }
   },
@@ -41,6 +43,20 @@
       "description": "Access token from Manager Settings → Access Tokens (sent as X-API-KEY).",
       "sensitive": true,
       "required": true
+    },
+    "write_scopes": {
+      "type": "string",
+      "title": "Write scopes",
+      "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger. Leave empty for read-only.",
+      "required": false,
+      "default": ""
+    },
+    "delete_scopes": {
+      "type": "string",
+      "title": "Delete scopes",
+      "description": "Comma-separated domains for delete only. Never implied by write scopes. Leave empty for no deletes.",
+      "required": false,
+      "default": ""
     }
   },
   "compatibility": {

@@ -1,0 +1,42 @@
+{
+  "name": "manager-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for self-hosted Manager.io bookkeeping (read-only by default; optional write/delete scopes).",
+  "author": {
+    "name": "flumpiey"
+  },
+  "homepage": "https://github.com/flumpiey/manager-mcp",
+  "repository": "https://github.com/flumpiey/manager-mcp",
+  "license": "MIT",
+  "keywords": ["mcp", "manager.io", "accounting", "bookkeeping"],
+  "logo": "docs/manager-icon.svg",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "MANAGER_API_URL": {
+        "type": "string",
+        "title": "Manager API URL",
+        "description": "Instance root including /api2 when required (e.g. http://127.0.0.1:55667/api2).",
+        "default": "http://127.0.0.1:55667/api2"
+      },
+      "MANAGER_API_KEY": {
+        "type": "string",
+        "title": "Manager API key",
+        "description": "Access token from Manager Settings → Access Tokens (sent as X-API-KEY)."
+      },
+      "MANAGER_MCP_WRITE_SCOPES": {
+        "type": "string",
+        "title": "Write scopes",
+        "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger. Empty = read-only.",
+        "default": ""
+      },
+      "MANAGER_MCP_DELETE_SCOPES": {
+        "type": "string",
+        "title": "Delete scopes",
+        "description": "Comma-separated domains for delete only. Never implied by write scopes. Empty = no deletes.",
+        "default": ""
+      }
+    },
+    "required": ["MANAGER_API_URL", "MANAGER_API_KEY"]
+  }
+}
