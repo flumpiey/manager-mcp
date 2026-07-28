@@ -1,4 +1,4 @@
-"""Async httpx client for Manager.io API2 (GET always; writes opt-in)."""
+"""Async httpx client for Manager.io API2 (GET always; writes scope-gated)."""
 
 from __future__ import annotations
 
@@ -7,30 +7,19 @@ from typing import Any
 
 import httpx
 
+from manager_mcp.scopes import WRITE_METHODS, WritePolicy, WritesDeniedError
+
 BASE_QUERY_KEYS = frozenset(
     {"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"}
 )
-WRITE_ENV = "MANAGER_MCP_ALLOW_WRITES"
-EXPLICIT_TRUTHY = frozenset({"1", "true", "yes", "on"})
-WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 class ConfigError(ValueError):
     """Missing or invalid Manager connection configuration."""
 
 
-class WritesDisabledError(RuntimeError):
-    """Raised when a write method is used without MANAGER_MCP_ALLOW_WRITES."""
-
-
-def writes_enabled(environ: dict[str, str] | None = None) -> bool:
-    """True only when MANAGER_MCP_ALLOW_WRITES is 1|true|yes|on (case-insensitive)."""
-    env = environ if environ is not None else os.environ
-    return env.get(WRITE_ENV, "").strip().casefold() in EXPLICIT_TRUTHY
-
-
 class ManagerClient:
-    """httpx wrapper. GET always; POST/PUT/PATCH/DELETE require allow_writes."""
+    """httpx wrapper. GET always; mutations require WritePolicy authorization."""
 
     def __init__(
         self,
@@ -39,7 +28,7 @@ class ManagerClient:
         *,
         client: httpx.AsyncClient | None = None,
         extra_query_keys: frozenset[str] | None = None,
-        allow_writes: bool = False,
+        policy: WritePolicy | None = None,
     ) -> None:
         if not base_url or not base_url.strip():
             raise ConfigError("MANAGER_API_URL is required")
@@ -48,7 +37,7 @@ class ManagerClient:
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key.strip()
         self._extra_query_keys = extra_query_keys or frozenset()
-        self.allow_writes = allow_writes
+        self.policy = policy or WritePolicy(frozenset(), frozenset())
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
             base_url=self.base_url,
@@ -57,12 +46,17 @@ class ManagerClient:
         )
 
     @classmethod
-    def from_env(cls, *, extra_query_keys: frozenset[str] | None = None) -> ManagerClient:
+    def from_env(
+        cls,
+        *,
+        extra_query_keys: frozenset[str] | None = None,
+        policy: WritePolicy | None = None,
+    ) -> ManagerClient:
         return cls(
             os.environ.get("MANAGER_API_URL", ""),
             os.environ.get("MANAGER_API_KEY", ""),
             extra_query_keys=extra_query_keys,
-            allow_writes=writes_enabled(),
+            policy=policy if policy is not None else WritePolicy.from_env(),
         )
 
     def clean_params(self, params: dict[str, Any] | None) -> dict[str, Any]:
@@ -100,11 +94,9 @@ class ManagerClient:
         json: Any = None,
     ) -> Any:
         method = method.upper()
-        if method in WRITE_METHODS and not self.allow_writes:
-            raise WritesDisabledError(
-                f"{method} requires {WRITE_ENV}=1 (or true|yes|on). Writes are off by default."
-            )
         url_path = path if path.startswith("/") else f"/{path}"
+        if method in WRITE_METHODS:
+            self.policy.authorize(method, url_path)
         response = await self._client.request(
             method,
             url_path,
@@ -119,3 +111,12 @@ class ManagerClient:
     async def aclose(self) -> None:
         if self._owns_client:
             await self._client.aclose()
+
+
+__all__ = [
+    "BASE_QUERY_KEYS",
+    "ConfigError",
+    "ManagerClient",
+    "WRITE_METHODS",
+    "WritesDeniedError",
+]

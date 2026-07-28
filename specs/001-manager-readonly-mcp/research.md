@@ -99,7 +99,7 @@ response metadata MUST tell the agent results may be incomplete / another
 **Rationale**: Covers US1–US4 without API sprawl. Bank dual exposure is
 intentional (snapshot vs drill-in).
 
-## 6. Config & write hard-stop
+## 6. Config & scoped writes
 
 **Decision**:
 
@@ -107,14 +107,15 @@ intentional (snapshot vs drill-in).
 |----------|------|
 | `MANAGER_API_URL` | Opaque API root (include `/api2`) |
 | `MANAGER_API_KEY` | Token → `X-API-KEY` (prefer secret manager) |
-| `MANAGER_MCP_ALLOW_WRITES` | If set/truthy → hard-fail (v2 roadmap trap) |
-| `ALLOW_WRITES`, `MANAGER_MCP_WRITES` | Near-miss variants → same hard-fail |
+| `MANAGER_MCP_WRITE_SCOPES` | CSV of enumerated domains → POST/PUT (and PATCH if used) |
+| `MANAGER_MCP_DELETE_SCOPES` | CSV of enumerated domains → DELETE only (never implied by write) |
+| `MANAGER_MCP_ALLOW_WRITES` / near-misses | Legacy → hard-fail; point to scope vars |
 
-Missing URL/key → clear config error at first client use (lazy init). Guard
-runs when server/tools initialize so a truthy write flag never yields a
-silently read-only process.
+Missing URL/key → clear config error at first client use (lazy init). Empty
+scopes → read-only tool set. Client denylist is absolute. Unknown scope
+tokens / wildcards hard-fail at startup.
 
-**Rationale**: Spec clarifications Q3–Q4. Canonical names locked here for
+**Rationale**: Spec FR-005 (scoped writes). Canonical names locked for
 docs/code/tests.
 
 ## 7. Packaging, skill, CI

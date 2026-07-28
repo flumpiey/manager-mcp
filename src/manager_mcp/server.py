@@ -1,4 +1,4 @@
-"""FastMCP Manager.io server (stdio via `manager-mcp`). Writes opt-in via env."""
+"""FastMCP Manager.io server (stdio via `manager-mcp`). Writes via scope envs."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from manager_mcp.client import WRITE_METHODS, ManagerClient, writes_enabled
+from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
+from manager_mcp.scopes import WritePolicy
+from manager_mcp.writable import WRITABLE, implemented_for_scope
 
 _PERIOD_ALIASES = {
     "from_date": "fromDate",
@@ -19,20 +21,30 @@ _PERIOD_ALIASES = {
 
 mcp = FastMCP("manager-mcp")
 _client: ManagerClient | None = None
+_policy: WritePolicy | None = None
 _write_tools_registered = False
+
+
+def get_policy() -> WritePolicy:
+    global _policy
+    if _policy is None:
+        _policy = WritePolicy.from_env()
+    return _policy
 
 
 def get_client() -> ManagerClient:
     global _client
     if _client is None:
-        _client = ManagerClient.from_env()
+        _client = ManagerClient.from_env(policy=get_policy())
     return _client
 
 
 def reset_client() -> None:
-    """Test helper: drop cached client."""
-    global _client
+    """Test helper: drop cached client and policy."""
+    global _client, _policy, _write_tools_registered
     _client = None
+    _policy = None
+    _write_tools_registered = False
 
 
 def _normalize_period(period: dict[str, Any], date_params: tuple[str, ...]) -> dict[str, Any]:
@@ -228,41 +240,76 @@ async def tax_summary(
     return await _fetch_report("tax_summary", from_date=from_date, to_date=to_date)
 
 
-async def api_write(
-    method: str,
-    path: str,
-    body: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """POST/PUT/PATCH/DELETE a Manager API2 path. Requires MANAGER_MCP_ALLOW_WRITES."""
-    verb = method.upper()
-    if verb not in WRITE_METHODS:
-        raise ValueError(f"method must be one of {sorted(WRITE_METHODS)}")
-    if not path.startswith("/") or ".." in path:
-        raise ValueError("path must be an absolute API path starting with /")
-    client = get_client()
-    if verb == "DELETE":
-        result = await client.delete(path)
-    elif verb == "POST":
-        result = await client.post(path, json=body)
-    elif verb == "PUT":
-        result = await client.put(path, json=body)
-    else:
-        result = await client.patch(path, json=body)
-    return {"method": verb, "path": path, "body": result}
+def _make_create_tool(resource_name: str) -> Any:
+    w = WRITABLE[resource_name]
+    stem = w.tool_stem
+
+    async def _create(fields: dict[str, Any]) -> dict[str, Any]:
+        body = await get_client().post(w.form_path, json=fields)
+        return {"resource": resource_name, "body": body}
+
+    _create.__name__ = f"create_{stem}"
+    notes = f" {w.create_notes}" if w.create_notes else ""
+    _create.__doc__ = (
+        f"Create a {stem.replace('_', ' ')} via POST {w.form_path}. "
+        f"Requires {w.scope!r} in MANAGER_MCP_WRITE_SCOPES.{notes}"
+    )
+    return _create
+
+
+def _make_update_tool(resource_name: str) -> Any:
+    w = WRITABLE[resource_name]
+    stem = w.tool_stem
+
+    async def _update(key: str, fields: dict[str, Any]) -> dict[str, Any]:
+        path = f"{w.form_path}/{key}"
+        body = await get_client().put(path, json=fields)
+        return {"resource": resource_name, "key": key, "body": body}
+
+    _update.__name__ = f"update_{stem}"
+    _update.__doc__ = (
+        f"Update a {stem.replace('_', ' ')} via PUT {w.form_path}/{{key}}. "
+        f"Requires {w.scope!r} in MANAGER_MCP_WRITE_SCOPES. "
+        "Prefer GET form → modify → PUT (full document replace)."
+    )
+    return _update
+
+
+def _make_delete_tool(resource_name: str) -> Any:
+    w = WRITABLE[resource_name]
+    stem = w.tool_stem
+
+    async def _delete(key: str) -> dict[str, Any]:
+        path = f"{w.form_path}/{key}"
+        body = await get_client().delete(path)
+        return {"resource": resource_name, "key": key, "body": body}
+
+    _delete.__name__ = f"delete_{stem}"
+    _delete.__doc__ = (
+        f"Delete a {stem.replace('_', ' ')} via DELETE {w.form_path}/{{key}}. "
+        f"Requires {w.scope!r} in MANAGER_MCP_DELETE_SCOPES "
+        "(write scope alone is not enough)."
+    )
+    return _delete
 
 
 def register_write_tools() -> None:
-    """Register api_write when MANAGER_MCP_ALLOW_WRITES is truthy."""
+    """Validate scope env and register create_*/update_*/delete_* for implemented scopes."""
     global _write_tools_registered
-    if _write_tools_registered or not writes_enabled():
+    if _write_tools_registered:
         return
-    mcp.tool(
-        name="api_write",
-        description=(
-            "Mutating Manager.io API call (POST/PUT/PATCH/DELETE). "
-            "Only available when MANAGER_MCP_ALLOW_WRITES is enabled."
-        ),
-    )(api_write)
+    policy = get_policy()
+    for scope in sorted(policy.write_scopes | policy.delete_scopes):
+        for w in implemented_for_scope(scope):
+            stem = w.tool_stem
+            if w.scope in policy.write_scopes:
+                create_fn = _make_create_tool(w.name)
+                update_fn = _make_update_tool(w.name)
+                mcp.tool(name=f"create_{stem}", description=create_fn.__doc__)(create_fn)
+                mcp.tool(name=f"update_{stem}", description=update_fn.__doc__)(update_fn)
+            if w.scope in policy.delete_scopes:
+                delete_fn = _make_delete_tool(w.name)
+                mcp.tool(name=f"delete_{stem}", description=delete_fn.__doc__)(delete_fn)
     _write_tools_registered = True
 
 

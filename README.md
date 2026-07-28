@@ -1,8 +1,8 @@
 # manager-mcp
 
-Read-only [MCP](https://modelcontextprotocol.io/) server for self-hosted
-[Manager.io](https://www.manager.io/) bookkeeping. Curated GET tools only — no
-create/update/delete.
+[MCP](https://modelcontextprotocol.io/) server for self-hosted
+[Manager.io](https://www.manager.io/) bookkeeping. Default is read-only; optional
+scoped writes via `MANAGER_MCP_WRITE_SCOPES` / `MANAGER_MCP_DELETE_SCOPES`.
 
 ## Requirements
 
@@ -38,7 +38,8 @@ Cursor / Claude Desktop / any MCP host — paste into MCP config:
 }
 ```
 
-Optional writes: add `"MANAGER_MCP_ALLOW_WRITES": "1"` under `env`.
+Optional scoped writes: `"MANAGER_MCP_WRITE_SCOPES": "quotes"` and optionally
+`"MANAGER_MCP_DELETE_SCOPES": "quotes"`.
 
 ### Local editable (dev)
 
@@ -81,10 +82,12 @@ uvx manager-mcp
 |----------|----------|-------|
 | `MANAGER_API_URL` | yes | Opaque base URL (include `/api2` when needed) |
 | `MANAGER_API_KEY` | yes | Sent as `X-API-KEY`; never logged |
-| `MANAGER_MCP_ALLOW_WRITES` | no | Opt-in writes: `1`/`true`/`yes`/`on` registers `api_write` (POST/PUT/PATCH/DELETE). Unset → read-only. |
+| `MANAGER_MCP_WRITE_SCOPES` | no | Comma-separated domains for create/update (e.g. `quotes,parties`). Empty = no writes. |
+| `MANAGER_MCP_DELETE_SCOPES` | no | Comma-separated domains for delete only. Never implied by WRITE_SCOPES. |
 
-Truthy values (case-insensitive): `1`, `true`, `yes`, `on`. Anything else (or
-unset) keeps the server read-only.
+Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`,
+`banking`, `payroll`, `ledger`. No wildcards. Legacy `MANAGER_MCP_ALLOW_WRITES`
+(and near-misses) hard-fail if set.
 
 ## Tools
 
@@ -100,7 +103,15 @@ unset) keeps the server read-only.
 | `profit_and_loss` | P&L |
 | `balance_sheet` | Balance sheet |
 | `tax_summary` | Tax summary |
-| `api_write` | POST/PUT/PATCH/DELETE (only if `MANAGER_MCP_ALLOW_WRITES` enabled) |
+| `create_*` / `update_*` / `delete_*` | Scoped mutations when scopes are set (see below) |
+
+**Write tools (opt-in):** registered only for resources in enabled scopes.
+Examples with `MANAGER_MCP_WRITE_SCOPES=quotes` and
+`MANAGER_MCP_DELETE_SCOPES=quotes`: `create_sales_quote`, `update_sales_quote`,
+`delete_sales_quote`, plus purchase twins. Other scopes follow the same pattern
+(`create_customer`, `create_sales_order`, `create_journal_entry`, …). Bodies are
+opaque Manager JSON; prefer GET form → modify → PUT. Client denylist blocks
+tokens, tax/currency, COA account forms, email templates, etc.
 
 **Bank dual path (intentional):** `bank_balances` answers “what are my balances?”;
 `list_records`/`get_record` on `bank_accounts` answers “find account X and show

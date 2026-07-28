@@ -1,47 +1,37 @@
-"""Write opt-in gate and default read-only tool-set tests."""
+"""Read-only default and legacy/scope startup guards."""
 
 from __future__ import annotations
 
 import pytest
 
-from manager_mcp.client import writes_enabled
-from manager_mcp.server import mcp, register_write_tools
+from manager_mcp.scopes import ScopeConfigError, WritePolicy
+from manager_mcp.server import mcp, register_write_tools, reset_client
 
-MUTATING_TOKENS = ("create", "update", "delete", "post", "put", "patch")
-
-
-@pytest.mark.parametrize("value", ["1", "true", "YES", "on"])
-def test_writes_enabled_truthy(value: str) -> None:
-    assert writes_enabled({"MANAGER_MCP_ALLOW_WRITES": value}) is True
-
-
-@pytest.mark.parametrize("value", ["", "   ", "0", "maybe", "false"])
-def test_writes_enabled_falsey(value: str) -> None:
-    assert writes_enabled({"MANAGER_MCP_ALLOW_WRITES": value}) is False
-
-
-def test_writes_enabled_unset() -> None:
-    assert writes_enabled({}) is False
+MUTATING_PREFIXES = ("create_", "update_", "delete_")
 
 
 @pytest.mark.asyncio
-async def test_default_tools_have_no_mutating_verbs() -> None:
-    tools = await mcp.list_tools()
-    names = [t.name.casefold() for t in tools]
-    assert names, "expected curated tools to be registered"
+async def test_default_tools_have_no_mutating_verbs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MANAGER_MCP_WRITE_SCOPES", raising=False)
+    monkeypatch.delenv("MANAGER_MCP_DELETE_SCOPES", raising=False)
+    for name in ("MANAGER_MCP_ALLOW_WRITES", "ALLOW_WRITES", "MANAGER_MCP_WRITES"):
+        monkeypatch.delenv(name, raising=False)
+    reset_client()
+    register_write_tools()
+    names = [t.name for t in await mcp.list_tools()]
+    assert names
     assert "api_write" not in names
     for name in names:
-        for token in MUTATING_TOKENS:
-            assert token not in name, f"mutating token {token!r} in tool {name!r}"
+        assert not name.startswith(MUTATING_PREFIXES)
 
 
-@pytest.mark.asyncio
-async def test_register_write_tools_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MANAGER_MCP_ALLOW_WRITES", "1")
-    # Force re-register path: module may already have registered in another test.
-    import manager_mcp.server as server
+def test_legacy_allow_writes_hard_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MANAGER_MCP_ALLOW_WRITES", "true")
+    with pytest.raises(ScopeConfigError, match="no longer supported"):
+        WritePolicy.from_env()
 
-    server._write_tools_registered = False
-    register_write_tools()
-    names = {t.name for t in await mcp.list_tools()}
-    assert "api_write" in names
+
+def test_unknown_scope_hard_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MANAGER_MCP_WRITE_SCOPES", "invoices")
+    with pytest.raises(ScopeConfigError, match="unknown scope"):
+        WritePolicy.from_env()

@@ -27,26 +27,28 @@ Must include:
 
 - Client GET-only / missing env errors
 - Resource resolve allowlist
-- Write-flag hard-fail (`MANAGER_MCP_ALLOW_WRITES` + near-misses)
-- Tool set has no mutate verbs
+- Legacy write-env hard-fail (`MANAGER_MCP_ALLOW_WRITES` + near-misses)
+- Empty scopes → tool set has no `create_`/`update_`/`delete_` verbs
 - `list_records` truncation metadata / `get_record` path shape
 
 ## Manual MCP acceptance
 
-1. Export `MANAGER_API_URL` and `MANAGER_API_KEY` (write flags **unset**).
+1. Export `MANAGER_API_URL` and `MANAGER_API_KEY` (scope vars **unset** for read-only).
 2. Run `manager-mcp` (or configure MCP client with that command).
 3. Call `list_resources` → curated list + read-only boundary.
 4. `aged_receivables` / outstanding question path → matches books.
 5. `bank_balances` then `list_records`/`get_record` on `bank_accounts` → both work.
 6. Set `MANAGER_MCP_ALLOW_WRITES=1` and restart → process **fails loudly**.
-7. Confirm skill: `skills/manager-accounting/SKILL.md` mentions Manager.io and read-only.
+7. Set `MANAGER_MCP_WRITE_SCOPES=not-a-scope` → hard-fail listing valid scopes.
+8. Confirm skill: `skills/manager-accounting/SKILL.md` mentions Manager.io and read-only default.
 
 ## Config failure checks
 
 | Condition | Expected |
 |-----------|----------|
 | Missing URL or key | Clear config error |
-| Truthy write env / near-miss | Startup/guard hard-fail |
+| Legacy boolean write env | Startup hard-fail |
+| Unknown scope CSV token | Startup hard-fail |
 | Bad token | Auth error, key not echoed |
 
 ## References

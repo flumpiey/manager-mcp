@@ -14,7 +14,7 @@
 
 - Q: For financial snapshots (P&L, balance sheet, tax, aging), can the agent specify a date/period? → A: Optional date/period only where the live endpoint exposes a date/period query param; if unsupported, that view is current/default-only in v1 and the agent must say so.
 - Q: Which collections support search, paging, and fetch-by-key in v1? → A: Sales invoices, purchase invoices, chart of accounts, customers, suppliers, and bank accounts. Bank/cash is intentionally dual-exposed: snapshot balances tool and searchable/drill-in collection (not redundancy).
-- Q: What counts as a write-enable attempt that must fail loudly? → A: Both (C): (A) startup hard-fail if known write-related env/config keys are set, including the planned `MANAGER_MCP_ALLOW_WRITES` and near-miss variants (`ALLOW_WRITES`, `MANAGER_MCP_WRITES`); names MUST match whatever `plan.md` settles so checks and docs cannot drift; (B) regression guarantee via tests that the registered tool set contains no create/update/delete verbs. Rationale: A catches operators who set a roadmap flag expecting writes; without it they get a silently read-only server. B catches future contributors/agents adding a mutating tool — A alone does not.
+- Q: What counts as a write-enable attempt that must fail loudly? → A: (a) legacy boolean keys `MANAGER_MCP_ALLOW_WRITES` / `ALLOW_WRITES` / `MANAGER_MCP_WRITES` hard-fail if set (point operators to scope vars); (b) unknown/wildcard tokens in `MANAGER_MCP_WRITE_SCOPES` / `MANAGER_MCP_DELETE_SCOPES` hard-fail; (c) empty scopes → registered tools must have no create/update/delete verbs (regression-tested); (d) when scopes are set, only verb-named tools for implemented scoped resources, with client denylist absolute.
 - Q: Besides access token, how does the user identify which Manager books to read? → A: `MANAGER_API_URL` + `MANAGER_API_KEY` only (URL may include business/`api2` path). Confirmed flat path layout (`/customers`, not `/{business}/customers`); a single opaque `MANAGER_API_URL` (including `/api2` when required) scopes which books are read and absorbs other editions’ path shapes. Separate business ID (B) would hard-code unsupported path structure; token-only discovery (C) needs an unconfirmed endpoint. Open for plan/README: multi-business on one instance may not be disambiguated by flat `/api2` — validate before claiming support; already out of scope for v1 (documentation caveat, not a blocker).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -109,8 +109,10 @@ A user installs a companion Agent Skill from a skills registry. The skill’s de
 - Unknown collection or unsupported read capability: return a clear error listing what is supported (or pointing to discovery).
 - Record key not found: clear not-found error.
 - Oversized result sets: enforce pagination; mark truncated/incomplete results so the agent knows to request another page or narrow the search.
-- Attempt to enable writes via configuration: if any known write-related environment variable is set (canonical name as settled in `plan.md`, currently expected `MANAGER_MCP_ALLOW_WRITES`, plus near-miss variants such as `ALLOW_WRITES` and `MANAGER_MCP_WRITES`), the server MUST refuse to start with an explicit error — never silently ignore the flag and run read-only.
-- Mutating capability regression: the registered tool set MUST never include create/update/delete (or equivalent write) verbs; automated checks MUST fail if such a tool appears.
+- Legacy boolean write envs (`MANAGER_MCP_ALLOW_WRITES` / near-misses): refuse to start with an explicit error pointing to scope vars.
+- Unknown or wildcard scope tokens: refuse to start listing valid scopes.
+- Empty scopes: registered tool set MUST contain no create/update/delete verbs (regression-tested).
+- Non-empty scopes: only implemented verb-named tools for those scopes; denylist paths remain denied.
 - Saved-report identifiers: not required and not supported in v1; requests that depend on a pre-existing saved-report GUID are rejected or out of scope with a clear message.
 - Date/period requested on a view that has no date/period query param on the live endpoint: serve current/default data and tell the agent that period selection is unsupported for that view (do not invent filtered data).
 
@@ -128,18 +130,17 @@ Specs MUST respect `.specify/memory/constitution.md`:
   external service as a gate
 - Docs in scope explain intent/tradeoffs (no filler)
 
-**Feature-specific hardening**: v1 MUST NOT provide any write opt-in. Write-flag
-env vars and mutating tools MUST fail loudly (startup hard-fail and regression
-checks per FR-005). This is stricter than the constitution’s future-facing
-opt-in clause and is intentional for this release.
+**Feature-specific hardening**: Default remains read-only. Scoped writes use
+`MANAGER_MCP_WRITE_SCOPES` / `MANAGER_MCP_DELETE_SCOPES` (enumerated domains only).
+Legacy boolean write flags hard-fail (FR-005). Denylist paths are never writable.
 
 ### Functional Requirements
 
 - **FR-001**: The system MUST expose a Model Context Protocol server that an MCP client can start and use to query one Manager.io instance.
 - **FR-002**: The system MUST obtain `MANAGER_API_URL` (opaque instance base URL) and `MANAGER_API_KEY` (access token) only from environment configuration; credentials MUST NOT be hard-coded or written into logs or tool responses. The URL already scopes which books are read (including any `/api2` suffix or business path segment the deployment requires); v1 MUST NOT require a separate business-identifier setting.
 - **FR-003**: The system MUST reject startup or configuration when required environment values (base URL and access token) are missing or invalid, with an actionable error message.
-- **FR-004**: The system MUST NOT expose any capability that creates, edits, posts, or deletes data in Manager.io.
-- **FR-005**: The system MUST fail loudly (hard error) if configuration attempts to enable write/mutation capabilities; it MUST NOT silently ignore a write flag and continue read-only. In v1 this means: (a) refuse to start when any known write-related env key is set — canonical `MANAGER_MCP_ALLOW_WRITES` and near-miss variants `ALLOW_WRITES`, `MANAGER_MCP_WRITES` — if the trimmed value is non-empty. Explicit truthy set (case-insensitive): `1`, `true`, `yes`, `on`; any other non-empty value also fails closed; empty/unset → allow start; (b) keep a lasting regression check that the registered tool set contains no create/update/delete (or equivalent mutating) tools.
+- **FR-004**: When `MANAGER_MCP_WRITE_SCOPES` and `MANAGER_MCP_DELETE_SCOPES` are both empty/unset, the system MUST NOT expose any capability that creates, edits, posts, or deletes data in Manager.io.
+- **FR-005**: Write configuration MUST fail closed and be explicit: (a) legacy env keys `MANAGER_MCP_ALLOW_WRITES`, `ALLOW_WRITES`, and `MANAGER_MCP_WRITES` MUST hard-fail at startup if set to any non-empty value, with a message pointing operators to `MANAGER_MCP_WRITE_SCOPES` / `MANAGER_MCP_DELETE_SCOPES`; (b) unknown names, wildcards (`*`, `all`), or empty tokens in those scope CSVs MUST hard-fail at startup listing valid scopes; (c) when both scope vars are empty/unset, automated checks MUST confirm the registered tool set contains no `create_`/`update_`/`delete_` (or equivalent mutating) tools; (d) when scopes are non-empty, only verb-named tools for implemented resources in those scopes MAY be registered, and a client-layer denylist MUST still block never-writable paths.
 - **FR-006**: The system MUST provide a discovery capability that lists supported read operations and states the read-only boundary.
 - **FR-007**: The system MUST support read access for outstanding customer balances / receivables-oriented answers.
 - **FR-008**: The system MUST support read access for aged payables, bank/cash balances, trial balance, profit & loss, balance sheet, and tax summary without requiring the user to supply a saved-report GUID.
@@ -172,7 +173,7 @@ opt-in clause and is intentional for this release.
 - **SC-008**: When a user requests a period-specific snapshot for a view that lacks live date/period query support, the response still returns current/default data and explicitly discloses that period selection is unavailable (never silently implies the period was applied).
 - **SC-003**: Discovery returns a complete list of supported read capabilities in one request, and 100% of listed capabilities are non-mutating.
 - **SC-004**: When a collection has more matches than one page, the agent is informed that results are truncated or that another page is available in 100% of such responses.
-- **SC-005**: Setting a known write-related env var (canonical or near-miss variant) causes startup to fail with an explicit error in 100% of cases; additionally, automated verification confirms the registered tool set contains zero mutating (create/update/delete) tools.
+- **SC-005**: Setting a legacy write env var (`MANAGER_MCP_ALLOW_WRITES` or near-miss) causes startup to fail in 100% of cases; unknown scope names fail startup; with both scope vars empty, automated verification confirms zero `create_`/`update_`/`delete_` tools.
 - **SC-006**: The companion Agent Skill is installable from the project’s skill packaging and its description visibly states Manager.io/bookkeeping relevance and the read-only boundary.
 - **SC-007**: A reviewer can confirm the exposed capability count stays small and curated: discovery (`list_resources`) + `list_records` + `get_record` + seven report shortcuts ≈ 10 tools (`contracts/mcp-tools.md`), not a wholesale mirror of the Manager API; bank balances snapshot plus bank accounts collection counts as two intentional capabilities, not a defect.
 

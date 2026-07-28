@@ -50,12 +50,11 @@ six curated collections + seven report shortcuts; companion `SKILL.md`
 | Engineering baseline | PASS — MIT, Conventional Commits, CI 3.10+3.12 ruff+pytest | PASS |
 | No-slop docs | PASS — README/docstrings intent+tradeoffs; vendored spec README explains snapshot role | PASS |
 
-**Write-flag policy (settled names)**: Canonical `MANAGER_MCP_ALLOW_WRITES`.
-Near-misses also hard-fail at guard time: `ALLOW_WRITES`, `MANAGER_MCP_WRITES`.
-**Truthy** (case-insensitive, trimmed): `1`, `true`, `yes`, `on`. Any other
-non-empty value also fails closed (treat as enable attempt). Empty/unset → OK.
-Refuse to serve (raise). Docs and code MUST use these exact names so checks
-cannot drift from README/`.env.example`.
+**Write-scope policy (settled names)**: `MANAGER_MCP_WRITE_SCOPES` and
+`MANAGER_MCP_DELETE_SCOPES` (comma-separated enumerated domains; no wildcards).
+Delete never implied by write. Legacy `MANAGER_MCP_ALLOW_WRITES` /
+`ALLOW_WRITES` / `MANAGER_MCP_WRITES` hard-fail if set. Client denylist is
+absolute. Empty scopes → read-only tool set.
 
 ## Project Structure
 

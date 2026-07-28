@@ -1,17 +1,18 @@
 # Contract: MCP Tools (`manager-mcp`)
 
-Transport: MCP stdio via console script `manager-mcp`. All tools are **read-only**.
+Transport: MCP stdio via console script `manager-mcp`. Default tools are
+**read-only**; scoped mutations are opt-in via env.
 
 ## Safety (non-tool)
 
 On server init / first tool registration path:
 
-- If `MANAGER_MCP_ALLOW_WRITES`, `ALLOW_WRITES`, or `MANAGER_MCP_WRITES` is
-  set: **raise** when the trimmed value is non-empty. Explicit truthy set
-  (case-insensitive): `1`, `true`, `yes`, `on`. Any other non-empty value also
-  fails closed (do not start serving tools). Empty or unset → allow start.
-- Registered tool names MUST NOT include create/update/delete/post/put/patch
-  semantics (regression-tested).
+- Legacy `MANAGER_MCP_ALLOW_WRITES`, `ALLOW_WRITES`, `MANAGER_MCP_WRITES`: any
+  non-empty value → **raise** (point to scope vars).
+- `MANAGER_MCP_WRITE_SCOPES` / `MANAGER_MCP_DELETE_SCOPES`: comma-separated
+  enumerated scopes only; unknown names or wildcards → **raise**.
+- Empty scopes: registered tool names MUST NOT include `create_`/`update_`/`delete_`
+  (regression-tested). Client denylist blocks never-writable paths always.
 
 ## `list_resources`
 
@@ -76,15 +77,32 @@ Shared optional inputs (only forwarded if that report’s `date_params` non-empt
 
 **Errors**: auth; connectivity; unavailable path; never require saved-report GUID
 
+## Scoped write tools (opt-in)
+
+Registered only when the resource’s scope is enabled and the resource is
+implemented. Naming: `create_{stem}`, `update_{stem}`, `delete_{stem}`
+(e.g. `create_sales_quote`, `update_customer`, `delete_journal_entry`).
+
+| Verb | Env gate | HTTP |
+|------|----------|------|
+| create | scope ∈ `MANAGER_MCP_WRITE_SCOPES` | `POST {form_path}` body `fields` dict |
+| update | scope ∈ `MANAGER_MCP_WRITE_SCOPES` | `PUT {form_path}/{key}` body `fields` dict |
+| delete | scope ∈ `MANAGER_MCP_DELETE_SCOPES` | `DELETE {form_path}/{key}` |
+
+Client denylist is absolute. Unmapped mutating paths are denied (no generic
+`api_write`).
+
 ## Env contract
 
 | Name | Required |
 |------|----------|
 | `MANAGER_API_URL` | yes |
 | `MANAGER_API_KEY` | yes |
-| `MANAGER_MCP_ALLOW_WRITES` | must be unset/false |
-| `ALLOW_WRITES` | must be unset/false |
-| `MANAGER_MCP_WRITES` | must be unset/false |
+| `MANAGER_MCP_WRITE_SCOPES` | optional CSV of scopes |
+| `MANAGER_MCP_DELETE_SCOPES` | optional CSV of scopes |
+| `MANAGER_MCP_ALLOW_WRITES` | must be unset (legacy hard-fail) |
+| `ALLOW_WRITES` | must be unset (legacy hard-fail) |
+| `MANAGER_MCP_WRITES` | must be unset (legacy hard-fail) |
 
 ## Non-goals (contract)
 
