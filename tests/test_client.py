@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from manager_mcp.client import ConfigError, ManagerClient
+from manager_mcp.client import ConfigError, ManagerClient, ManagerUnavailableError
 from manager_mcp.scopes import WritePolicy, WritesDeniedError
 
 
@@ -107,6 +107,18 @@ async def test_get_http_error_propagates() -> None:
     )
     client = ManagerClient("http://example.test/api2", "bad")
     with pytest.raises(httpx.HTTPStatusError):
+        await client.get("/customers")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_connect_error_is_manager_unavailable() -> None:
+    respx.get("http://example.test/api2/customers").mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
+    client = ManagerClient("http://example.test/api2", "k")
+    with pytest.raises(ManagerUnavailableError, match="Ask the user to open Manager"):
         await client.get("/customers")
     await client.aclose()
 

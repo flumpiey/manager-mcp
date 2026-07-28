@@ -31,6 +31,8 @@ Pairs with the **manager-mcp** MCP server.
 - `MANAGER_API_URL` — opaque base URL (include `/api2` when required)
 - `MANAGER_API_KEY` — `X-API-KEY`; never echo
 - Scope CSVs must match between local `.env` and the MCP host `env` block
+- If a tool says Manager is not reachable: tell the user to open Manager
+  (API enabled) and retry — do not treat it as an MCP server crash
 
 ## Verify after write
 

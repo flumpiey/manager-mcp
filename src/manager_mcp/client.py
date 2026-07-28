@@ -18,6 +18,10 @@ class ConfigError(ValueError):
     """Missing or invalid Manager connection configuration."""
 
 
+class ManagerUnavailableError(RuntimeError):
+    """Manager API unreachable (process down, wrong URL, network)."""
+
+
 class ManagerClient:
     """httpx wrapper. GET always; mutations require WritePolicy authorization."""
 
@@ -97,12 +101,20 @@ class ManagerClient:
         url_path = path if path.startswith("/") else f"/{path}"
         if method in WRITE_METHODS:
             self.policy.authorize(method, url_path)
-        response = await self._client.request(
-            method,
-            url_path,
-            params=self.clean_params(params) if method == "GET" else None,
-            json=json,
-        )
+        try:
+            response = await self._client.request(
+                method,
+                url_path,
+                params=self.clean_params(params) if method == "GET" else None,
+                json=json,
+            )
+        except httpx.RequestError as exc:
+            # Keep MCP alive when Manager desktop/API is closed.
+            raise ManagerUnavailableError(
+                f"Manager.io is not reachable at {self.base_url}. "
+                "Ask the user to open Manager (with API enabled) and retry. "
+                f"Detail: {exc}"
+            ) from exc
         response.raise_for_status()
         if not response.content:
             return None
@@ -117,6 +129,7 @@ __all__ = [
     "BASE_QUERY_KEYS",
     "ConfigError",
     "ManagerClient",
+    "ManagerUnavailableError",
     "WRITE_METHODS",
     "WritesDeniedError",
 ]
