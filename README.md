@@ -340,7 +340,7 @@ Bodies are opaque Manager-native JSON. Prefer **GET form → modify → PUT** (f
 
 | Tool | Purpose | Period (`from_date` / `to_date`) |
 |------|---------|----------------------------------|
-| `list_resources` | Discovery + read-only boundary | — |
+| `list_resources` | Discovery; reports `read_only` + live write/delete scopes | — |
 | `list_records` | Search/page a curated collection | — |
 | `get_record` | Fetch one record via `{path}-form/{key}` | — |
 | `aged_receivables` | Outstanding / aging customers | Accepted; may be unsupported on this view |
@@ -371,7 +371,7 @@ Registered only for resources in enabled scopes. Pattern:
 
 Companion skill: [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md).
 
-In Cursor, copy or symlink that folder into your agent skills path (or keep it under this repo’s `skills/`). It tells the model the read-only default, when write tools exist, and which report tools to prefer for common bookkeeping questions.
+In Cursor, copy or symlink that folder into your agent skills path (or keep it under this repo’s `skills/`). It tells the model to call `list_resources` first, verify after writes, and which report tools to prefer.
 
 ## Development
 

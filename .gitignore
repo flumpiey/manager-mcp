@@ -22,6 +22,7 @@ graphify-out/
 specs/**/_quote-*.json
 specs/**/_quote-*.txt
 specs/**/_scope-paths-probe.json
+specs/**/_banking-*.json
 
 # -----------------------------------------------------------------------------
 # Environment & secrets

@@ -27,9 +27,8 @@ manager-mcp = "manager_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/manager_mcp"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/manager_mcp/assets" = "manager_mcp/assets"
+# Assets under src/manager_mcp/assets ship with the package; do not
+# force-include them again (duplicate path breaks the wheel).
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

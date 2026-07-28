@@ -342,6 +342,20 @@ def _make_delete_tool(resource_name: str) -> Any:
     return _delete
 
 
+_WRITE_ANNOTATIONS = {
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": False,
+    "openWorldHint": True,
+}
+_DELETE_ANNOTATIONS = {
+    "readOnlyHint": False,
+    "destructiveHint": True,
+    "idempotentHint": False,
+    "openWorldHint": True,
+}
+
+
 def register_write_tools() -> None:
     """Validate scope env and register create_*/update_*/delete_* for implemented scopes."""
     global _write_tools_registered
@@ -354,11 +368,23 @@ def register_write_tools() -> None:
             if w.scope in policy.write_scopes:
                 create_fn = _make_create_tool(w.name)
                 update_fn = _make_update_tool(w.name)
-                mcp.tool(name=f"create_{stem}", description=create_fn.__doc__)(create_fn)
-                mcp.tool(name=f"update_{stem}", description=update_fn.__doc__)(update_fn)
+                mcp.tool(
+                    name=f"create_{stem}",
+                    description=create_fn.__doc__,
+                    annotations=_WRITE_ANNOTATIONS,
+                )(create_fn)
+                mcp.tool(
+                    name=f"update_{stem}",
+                    description=update_fn.__doc__,
+                    annotations=_WRITE_ANNOTATIONS,
+                )(update_fn)
             if w.scope in policy.delete_scopes:
                 delete_fn = _make_delete_tool(w.name)
-                mcp.tool(name=f"delete_{stem}", description=delete_fn.__doc__)(delete_fn)
+                mcp.tool(
+                    name=f"delete_{stem}",
+                    description=delete_fn.__doc__,
+                    annotations=_DELETE_ANNOTATIONS,
+                )(delete_fn)
     _write_tools_registered = True
 
 

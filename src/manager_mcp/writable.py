@@ -57,6 +57,26 @@ _QUOTE_PURCHASE_NOTES = (
     "201 response includes Key. PUT is full-document replace."
 )
 
+_BANKING_WORKFLOW = (
+    "Workflow: list_resources (banking in write_scopes) → "
+    "get_record on a similar row as template → create_* → "
+    "get_record(resource, Key) to verify before done. "
+    "Clone Lines from the template; do not invent line keys. "
+    "For FX/foreign amounts, copy rate fields from the template or invoice."
+)
+
+_RECEIPT_NOTES = (
+    "Top-level fields seen live: Customer, Date, Description, ReceivedIn "
+    "(bank/cash account key), PaidBy, Reference, AmountsAreTaxExclusive, Lines. "
+    + _BANKING_WORKFLOW
+)
+
+_PAYMENT_NOTES = (
+    "Symmetric to receipts: bank side is typically PaidFrom (not ReceivedIn); "
+    "payee/supplier instead of Customer. "
+    + _BANKING_WORKFLOW
+)
+
 # Paths confirmed via live OpenAPI (Malva dev, 2026-07-28).
 WRITABLE: dict[str, WritableResource] = {
     # quotes
@@ -214,7 +234,7 @@ WRITABLE: dict[str, WritableResource] = {
         "receipts",
         tool_stem="receipt",
         implemented=True,
-        create_notes=_DEFAULT_NOTES,
+        create_notes=_RECEIPT_NOTES,
     ),
     "payments": _w(
         "payments",
@@ -224,7 +244,7 @@ WRITABLE: dict[str, WritableResource] = {
         "payments",
         tool_stem="payment",
         implemented=True,
-        create_notes=_DEFAULT_NOTES,
+        create_notes=_PAYMENT_NOTES,
     ),
     "inter_account_transfers": _w(
         "inter_account_transfers",
