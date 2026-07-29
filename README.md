@@ -12,6 +12,7 @@
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-stdio-green.svg)](https://modelcontextprotocol.io/)
 [![CI](https://github.com/flumpiey/manager-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/flumpiey/manager-mcp/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/manager-mcp.svg)](https://pypi.org/project/manager-mcp/)
 
 ## What is Manager.io?
 
@@ -49,31 +50,29 @@ Transport is **stdio**. No HTTP server. No global install required if you use [`
 - [uv](https://docs.astral.sh/uv/) (provides `uvx`)
 - A reachable Manager.io API: `MANAGER_API_URL` + `MANAGER_API_KEY`
 
-Create an access token in Manager under **Settings → Access Tokens**. The server sends it as `X-API-KEY`. Set `MANAGER_API_URL` to your instance root and include `/api2` when required (desktop often looks like `http://127.0.0.1:55667/api2`).
+### Access token
+
+1. In Manager, open **Settings → Access Tokens**.
+2. Create a token and copy the value into `MANAGER_API_KEY`.
+3. Set `MANAGER_API_URL` to your API base (desktop often `http://127.0.0.1:55667/api2`).
+
+`manager-mcp` sends the token as the `X-API-KEY` header. Full walkthrough: [Access Tokens](https://www.manager.io/guides/access-tokens).
 
 ## Quick start
+
+Run the [PyPI](https://pypi.org/project/manager-mcp/) package with [`uvx`](https://docs.astral.sh/uv/guides/tools/):
 
 ```bash
 uvx manager-mcp
 ```
 
-From source (GitHub):
+Paste a client config below, set `MANAGER_API_URL` / `MANAGER_API_KEY`, restart the host, then ask: *“Who owes me money?”* or *“Show bank balances.”*
 
-```bash
-uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp
-```
-
-Or from a local clone:
-
-```bash
-uvx --from /path/to/manager-mcp manager-mcp
-```
-
-Paste one of the client configs below, set `MANAGER_API_URL` / `MANAGER_API_KEY`, restart the host, then ask: *“Who owes me money?”* or *“Show bank balances.”*
+From a git clone (dev): `uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp` or `uv run --directory /path/to/manager-mcp manager-mcp`.
 
 ## Installation
 
-Replace `/path/to/manager-mcp` with your clone path (or use the `git+https://…` form). Leave write-scope env vars unset for read-only.
+Configs below pull [`manager-mcp`](https://pypi.org/project/manager-mcp/) from PyPI. Leave write-scope env vars unset for read-only.
 
 <details>
 <summary><strong>Cursor</strong></summary>
@@ -89,7 +88,7 @@ Marketplace listing is a separate submit at [cursor.com/marketplace/publish](htt
 
 **Manual `mcp.json`:** project [`.cursor/mcp.json`](.cursor/mcp.json) or user-wide `~/.cursor/mcp.json`.
 
-Zero-install:
+From PyPI:
 
 ```json
 {
@@ -97,7 +96,7 @@ Zero-install:
     "manager": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -159,7 +158,7 @@ Install the resulting `.mcpb` (double-click, drag onto Claude Desktop, or Settin
   "mcpServers": {
     "manager": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -194,7 +193,7 @@ Local clone:
 Add via CLI:
 
 ```bash
-claude mcp add manager --env MANAGER_API_URL=http://127.0.0.1:55667/api2 --env MANAGER_API_KEY=your-token -- uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp
+claude mcp add manager --env MANAGER_API_URL=http://127.0.0.1:55667/api2 --env MANAGER_API_KEY=your-token -- uvx manager-mcp
 ```
 
 Or edit `~/.claude.json` / project MCP config:
@@ -204,7 +203,7 @@ Or edit `~/.claude.json` / project MCP config:
   "mcpServers": {
     "manager": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -227,7 +226,7 @@ Create [`.vscode/mcp.json`](.vscode/mcp.json) in the project root:
     "manager": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -269,7 +268,7 @@ Edit `~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or the Windsurf MCP set
   "mcpServers": {
     "manager": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -293,7 +292,7 @@ Add under `context_servers` in Zed `settings.json` (Agent Panel → settings als
   "context_servers": {
     "manager": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -315,7 +314,7 @@ Edit the Cline MCP settings file (`cline_mcp_settings.json` via the Cline MCP UI
   "mcpServers": {
     "manager": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/flumpiey/manager-mcp", "manager-mcp"],
+      "args": ["manager-mcp"],
       "env": {
         "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
         "MANAGER_API_KEY": "your-token"
@@ -337,8 +336,6 @@ mcpServers:
   - name: manager
     command: uvx
     args:
-      - --from
-      - git+https://github.com/flumpiey/manager-mcp
       - manager-mcp
     env:
       MANAGER_API_URL: http://127.0.0.1:55667/api2
@@ -355,19 +352,16 @@ Any host that can spawn a stdio MCP server:
 | Field | Value |
 |-------|-------|
 | Command | `uvx` |
-| Args | `--from git+https://github.com/flumpiey/manager-mcp manager-mcp` |
+| Args | `manager-mcp` |
 | Env | `MANAGER_API_URL`, `MANAGER_API_KEY` (+ optional write scopes) |
-
-Recommended install (PyPI):
 
 ```bash
 uvx manager-mcp
 ```
 
-From source: `uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp`.
-Dev variant: `uv run --directory /path/to/manager-mcp manager-mcp`.
+Dev from a clone: `uv run --directory /path/to/manager-mcp manager-mcp`.
 
-`npx` only runs npm packages — this is a Python package; use `uvx`.
+`npx` only runs npm packages. This is a Python package; use `uvx`.
 
 </details>
 
