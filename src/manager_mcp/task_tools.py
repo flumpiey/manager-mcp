@@ -85,16 +85,20 @@ async def _post(
 async def _find_deposit_bank_account(client: ManagerClient) -> dict[str, Any] | None:
     body = await client.get(
         "/bank-and-cash-accounts",
-        params={"term": "deposit", "skip": 0, "pageSize": 50},
+        params={"skip": 0, "pageSize": 50},
     )
     if not isinstance(body, dict):
         return None
     items = body.get("bankAndCashAccounts") or []
     for item in items:
-        if isinstance(item, dict) and item.get("Key"):
-            name = str(item.get("Name") or item.get("text") or "").casefold()
-            if "deposit" in name:
-                return item
+        if not isinstance(item, dict):
+            continue
+        key = item.get("Key") or item.get("key")
+        if not key:
+            continue
+        name = str(item.get("Name") or item.get("name") or item.get("text") or "").casefold()
+        if "deposit" in name:
+            return {**item, "Key": key}
     return None
 
 

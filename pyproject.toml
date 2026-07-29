@@ -67,6 +67,10 @@ include = [
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = [
+  "integration: live Manager sandbox, requires TEST_MANAGER_API_URL env var",
+]
+addopts = "-m 'not integration'"
 
 [tool.ruff]
 line-length = 100
