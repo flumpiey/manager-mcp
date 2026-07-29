@@ -7,14 +7,14 @@
     "url": "https://github.com/flumpiey/manager-mcp",
     "source": "github"
   },
-  "version": "0.2.1",
+  "version": "0.2.2",
   "websiteUrl": "https://github.com/flumpiey/manager-mcp",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "manager-mcp",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -48,7 +48,7 @@
   ],
   "icons": [
     {
-      "src": "src/manager_mcp/assets/icon.png",
+      "src": "https://raw.githubusercontent.com/flumpiey/manager-mcp/main/src/manager_mcp/assets/icon.png",
       "mimeType": "image/png",
       "sizes": ["512x512"]
     }
