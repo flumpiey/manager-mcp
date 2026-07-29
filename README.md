@@ -6,6 +6,8 @@
 
 # manager-mcp
 
+<!-- mcp-name: io.github.flumpiey/manager-mcp -->
+
 **MCP server for self-hosted [Manager.io](https://www.manager.io/): ask your AI about invoices, balances, and books.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
