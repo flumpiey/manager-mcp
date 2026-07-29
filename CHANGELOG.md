@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.2.0] - TBD
+## [0.2.0] - 2026-07-29
 
 ### Added
 
@@ -12,6 +12,7 @@ All notable changes to this project are documented in this file.
 - `raw` escape-hatch scope restoring the full CRUD set for advanced use
 - `server.json` for MCP Registry discoverability
 - Explicit `[tool.hatch.build.targets.sdist]` include list
+- Live sandbox integration test suite (`pytest -m integration`, `TEST_MANAGER_API_*` env vars)
 
 ### Changed
 
