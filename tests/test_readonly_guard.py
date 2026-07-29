@@ -18,6 +18,9 @@ async def test_default_tools_have_no_mutating_verbs(monkeypatch: pytest.MonkeyPa
         monkeypatch.delenv(name, raising=False)
     reset_client()
     register_write_tools()
+    from manager_mcp.server import register_task_tools
+
+    register_task_tools()
     names = [t.name for t in await mcp.list_tools()]
     assert names
     assert "api_write" not in names

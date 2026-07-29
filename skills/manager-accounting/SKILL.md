@@ -2,9 +2,10 @@
 name: manager-accounting
 description: >-
   Use when the user asks about Manager.io books, balances, customers who owe
-  money, payables, bank, deposits, deposit invoices, trial balance, P&L,
-  balance sheet, tax, or scoped create/update/delete. Always call
-  list_resources first — trust read_only / write_scopes / delete_scopes.
+  money, payables, bank, deposits, customer deposits, deposit invoices,
+  record a payment, issue an invoice, post a journal, trial balance, P&L,
+  balance sheet, tax, or scoped task tools and create/update/delete.
+  Always call list_resources first.
 ---
 
 # Manager.io accounting
@@ -14,95 +15,96 @@ Pairs with the **manager-mcp** MCP server.
 ## Discovery first
 
 1. Call `list_resources`.
-2. Trust its `read_only`, `write_scopes`, `delete_scopes`, and `boundary`.
-3. Use only collections named in that response for `list_records` / `get_record`
-   (includes `receipts`, `payments`, quotes, etc. when listed — not a fixed six).
+2. Trust its `read_only`, `write_scopes`, `delete_scopes`, `effective_write_scopes`, and `boundary`.
+3. Use only collections named in that response for `list_records` / `get_record`.
 
 ## Boundary
 
-- Empty scopes → read-only tool set (no `create_*` / `update_*` / `delete_*`).
+- Empty scopes → read-only tool set (10 tools).
 - Mutations need `MANAGER_MCP_WRITE_SCOPES` (create/update) and/or
   `MANAGER_MCP_DELETE_SCOPES` (delete). Delete is never implied by write.
+- Recommended write scopes: `banking,sales,parties` (not all nine domains).
 - Never attempt access-token, chart-of-accounts / control-account forms,
   tax/currency minting, starting balances, or other denylisted paths.
-- Bank/cash accounts (`create_bank_account`) are allowed when `banking` is in
-  WRITE_SCOPES — still never create COA control accounts.
+- `raw` in WRITE_SCOPES restores the full CRUD set (advanced escape hatch).
 
 ## Config
 
-- `MANAGER_API_URL` — opaque base URL (include `/api2` when required)
-- `MANAGER_API_KEY` — `X-API-KEY`; never echo
+- `MANAGER_API_URL` - opaque base URL (include `/api2` when required)
+- `MANAGER_API_KEY` - `X-API-KEY`; never echo
 - Scope CSVs must match between local `.env` and the MCP host `env` block
 - If a tool says Manager is not reachable: tell the user to open Manager
-  (API enabled) and retry — do not treat it as an MCP server crash
+  (API enabled) and retry. Do not treat it as an MCP server crash.
+
+## Precondition responses
+
+When a tool returns `status: precondition_failed`:
+
+1. Relay each item's `how_to_create` text to the user **verbatim**.
+2. Stop. Do not invent a workaround or skip setup steps.
+
+## Task tools (prefer over CRUD)
+
+Registered when required scopes are in `effective_write_scopes`:
+
+| Tool | Scopes | Bookkeeper sentence |
+|------|--------|---------------------|
+| `issue_sales_invoice` | sales | Issue a sales invoice |
+| `issue_purchase_invoice` | purchases | Issue a purchase invoice |
+| `issue_quote` | quotes | Issue a quote |
+| `convert_quote_to_invoice` | quotes + sales | Turn this quote into an invoice |
+| `record_customer_payment` | banking | Record a customer payment against an invoice |
+| `record_supplier_payment` | banking | Pay a supplier invoice |
+| `record_expense` | payroll and/or purchases | Record an expense |
+| `transfer_between_accounts` | banking | Move money between accounts |
+| `post_journal_entry` | ledger | Post a journal entry |
+| `void_document` | matching delete scope | Void this document |
+| `record_customer_deposit` | banking | Record a customer deposit |
+| `issue_deposit_invoice` | quotes | Issue a deposit invoice document |
+| `apply_deposit_to_invoice` | ledger | Apply held deposit to an invoice |
+
+`create_customer` and `create_supplier` remain as single-resource CRUD tools (parties scope).
+
+Per-resource CRUD is **deprecated in 0.2.0** (removed in 0.3.0). Use task tools unless `raw` scope is set.
 
 ## Verify after write
 
-For any `create_*` / `update_*`:
+For any mutation:
 
 1. Prefer `get_record` on a **similar** existing row as a body template.
 2. Mutate.
 3. `get_record` the returned `Key` before treating the change as done.
-4. If wrong and delete scope is enabled, `delete_*` and retry.
+4. If wrong and delete scope is enabled, `void_document` or `delete_*` and retry.
 
-## Deposit invoice workflow (follow this)
+## Customer deposit workflow
 
-Use when the user takes a **deposit** (quote styled as deposit invoice),
-receives cash into a **deposit** bank/cash account, then later allocates it to
-a sales invoice via **journal entry**.
+**A deposit is not revenue.** Do not book it to an income account. Confirm tax/VAT treatment with the user's accountant.
 
-Required scopes: `quotes`, `banking`, `ledger` (add `sales` if creating the
-final invoice via MCP).
+Order of operations:
 
-### 0. Resolve deposit account (mandatory first)
+1. **`record_customer_deposit`** (or ensure deposit bank account exists first; see preconditions).
+2. **`issue_deposit_invoice`** when the customer needs a document for the deposit (optional; still a quote in Manager).
+3. Raise the final sales invoice (`issue_sales_invoice` or user-created).
+4. **`apply_deposit_to_invoice`** via journal entry (clone `get_record` on `journal_entries`).
 
-1. `list_records(resource="bank_accounts", term="deposit")` (also try
-   "customer deposit", "deposits").
-2. If none found: tell the user no deposit account is set up, recommend creating
-   one (e.g. Name `Customer deposits`), and if `banking` ∈ write_scopes call
-   `create_bank_account` with `{ "Name": "Customer deposits" }` (or the name
-   they choose). Verify with `get_record` / list.
-3. Keep the deposit account `Key` — it is `ReceivedIn` on the receipt.
+Required scopes: `banking` (deposit receipt), `quotes` (deposit invoice doc), `ledger` (apply to invoice), `sales` (final invoice via MCP).
 
-### 1. Deposit invoice (quote)
+### Deposit account (Option A: guide only)
 
-1. Clone a sales quote template via `get_record` when possible.
-2. `create_sales_quote` (or update) with title/description clearly
-   **Deposit invoice** (and customer, amount, dates as needed).
-3. This is still a **quote** in Manager — not a sales invoice.
-
-### 2. Receive the deposit
-
-1. `create_receipt` with:
-   - `ReceivedIn` = deposit account key from step 0
-   - `Customer`, `Date`, `PaidBy` (int), `Lines` (clone template; do not invent keys)
-2. Check tool `warnings`. Do **not** clear the final sales invoice here unless
-   the user is applying the deposit that way.
-
-### 3. Final invoice + allocate deposit
-
-1. Ensure the sales invoice exists (`create_sales_invoice` or user-created).
-2. Clone an existing journal that allocates deposits (if any) via `get_record`
-   on `journal_entries`.
-3. `create_journal_entry`: move balance **out of** the deposit account and onto
-   the invoice / AR (same shape as the user’s books — clone, don’t guess).
-4. Verify invoice balance / deposit account with reads.
-
-### 4. If scopes missing
-
-If `quotes` / `banking` / `ledger` are not in `write_scopes`, tell the user
-which env scopes to enable — do not invent a workaround.
+`record_customer_deposit` checks for a bank/cash account whose name contains "deposit".
+If missing, it returns `precondition_failed` with UI steps. Relay those steps verbatim.
+Do not book the deposit to a revenue account as a workaround.
 
 ## Banking cheat-sheet (`banking` scope)
 
 - MCP **rejects** empty `{}`, unknown names (`BankAccount`, etc.), and non-int
-  `PaidBy` before POST — clone a `get_record` template.
+  `PaidBy` before POST. Clone a `get_record` template.
 - Receipts: `ReceivedIn`, `Customer`, `Date`, `PaidBy` (int), `ExchangeRate`,
   `Lines` with `Amount`, `AccountsReceivableCustomer`,
   `AccountsReceivableSalesInvoice` (and `Account` for fees/FX).
 - Payments: `PaidFrom`, `Supplier`, `Date`, `Lines` (AP analogues).
 - FX: AR `Amount` is base currency; Manager uses the **invoice** rate to clear
-  USD — set AR in invoice-rate ZAR (or add an FX line), not bank-net alone.
+  USD. Set AR in invoice-rate ZAR (or add an FX line), not bank-net alone.
 - After create, check tool `warnings` (persistence diff).
 
 ## Read tools

@@ -1,7 +1,7 @@
 {
   "name": "manager-mcp",
-  "version": "0.1.1",
-  "description": "MCP server for self-hosted Manager.io bookkeeping (read-only by default; optional write/delete scopes).",
+  "version": "0.2.0",
+  "description": "MCP server for Manager.io bookkeeping: read-first with opt-in scoped task and write tools.",
   "author": {
     "name": "flumpiey"
   },
@@ -27,7 +27,7 @@
       "MANAGER_MCP_WRITE_SCOPES": {
         "type": "string",
         "title": "Write scopes",
-        "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger. Empty = read-only.",
+        "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger,raw. Recommended: banking,sales,parties. Empty = read-only.",
         "default": ""
       },
       "MANAGER_MCP_DELETE_SCOPES": {

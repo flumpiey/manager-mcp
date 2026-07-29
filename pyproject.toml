@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "manager-mcp"
-version = "0.1.1"
-description = "Read-only MCP server for Manager.io bookkeeping"
+version = "0.2.0"
+description = "MCP server for Manager.io bookkeeping: read-first with opt-in scoped task and write tools"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Dru Connold" }]
@@ -17,6 +17,8 @@ keywords = [
   "accounting",
   "fastmcp",
   "bookkeeping",
+  "customer-deposits",
+  "task-tools",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -40,6 +42,8 @@ dev = [
   "pytest-asyncio",
   "respx",
   "ruff",
+  "hatchling",
+  "hatch",
 ]
 
 [project.scripts]
@@ -49,6 +53,15 @@ manager-mcp = "manager_mcp.server:main"
 packages = ["src/manager_mcp"]
 # Assets under src/manager_mcp/assets ship with the package; do not
 # force-include them again (duplicate path breaks the wheel).
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/",
+  "tests/",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

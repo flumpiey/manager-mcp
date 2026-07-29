@@ -6,7 +6,7 @@
 
 # manager-mcp
 
-**MCP server for self-hosted [Manager.io](https://www.manager.io/) — ask your AI about invoices, balances, and books.**
+**MCP server for self-hosted [Manager.io](https://www.manager.io/): ask your AI about invoices, balances, and books.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](https://www.python.org/)
@@ -31,9 +31,11 @@ Useful Manager.io links:
 
 Default is **read-only**. You get:
 
-- **10 read tools** — discovery, six searchable collections, seven report shortcuts
-- **Optional scoped writes** — 23 resource types across 9 domains (`quotes`, `orders`, `parties`, …), enabled only when you set env scopes
-- **Hard denylist** — access tokens, chart of accounts forms, tax/currency, email templates, and similar high-risk paths stay blocked even when writes are on
+- **10 read tools** - discovery, six searchable collections, seven report shortcuts
+- **Task tools (opt-in)** - intent-shaped writes such as `record_customer_payment`, `issue_sales_invoice`, `record_customer_deposit` (register when matching write scopes are set)
+- **Deprecated CRUD tools** - per-resource `create_*` / `update_*` / `delete_*` still register under scopes until **0.3.0**; prefer task tools
+- **`raw` escape hatch** - restores the full CRUD set for advanced use
+- **Hard denylist** - access tokens, chart of accounts forms, tax/currency, email templates, and similar high-risk paths stay blocked even when writes are on
 
 Transport is **stdio**. No HTTP server. No global install required if you use [`uv`](https://docs.astral.sh/uv/) / `uvx`.
 
@@ -41,7 +43,7 @@ Transport is **stdio**. No HTTP server. No global install required if you use [`
 
 - **stdio hosts (Cursor, Claude Desktop via `mcp.json`):** the server advertises Manager branding in MCP `serverInfo.icons` (embedded PNG data URI, plus a GitHub raw HTTPS fallback).
 - **Cursor plugin:** [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) uses [`docs/manager-icon.svg`](docs/manager-icon.svg).
-- **Claude Desktop Extension:** pack [`mcpb/`](mcpb/) (includes `icon.png`) — see Installation → Claude Desktop below.
+- **Claude Desktop Extension:** pack [`mcpb/`](mcpb/) (includes `icon.png`). See Installation → Claude Desktop below.
 - **Claude.ai remote connectors:** Claude.ai ignores `serverInfo.icons` and uses the **root-domain favicon** of the connector URL. If you host a remote MCP later, serve [`docs/favicon.ico`](docs/favicon.ico) at the registrable domain root (e.g. `https://acme.com/favicon.ico` for `https://mcp.acme.com/...`).
 
 ## Requirements
@@ -374,38 +376,88 @@ Dev from a clone: `uv run --directory /path/to/manager-mcp manager-mcp`.
 | `MANAGER_MCP_WRITE_SCOPES` | no | Comma-separated domains for create/update. Empty = no writes. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | Comma-separated domains for delete only. Never implied by WRITE_SCOPES. |
 
-Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`. No wildcards (`*`, `all`).
+Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`, `raw`. No wildcards (`*`, `all`).
 
-Legacy `MANAGER_MCP_ALLOW_WRITES` / `ALLOW_WRITES` / `MANAGER_MCP_WRITES` hard-fail if set — use the scoped vars instead.
+**Recommended** (covers most bookkeeping without 82 tools):
+
+```json
+"MANAGER_MCP_WRITE_SCOPES": "banking,sales,parties",
+"MANAGER_MCP_DELETE_SCOPES": "sales,banking"
+```
+
+Default with no scopes: **10 tools**. All nine domain scopes plus every CRUD verb: up to **82 tools**. Use `raw` only when you need the full CRUD escape hatch.
+
+Legacy `MANAGER_MCP_ALLOW_WRITES` / `ALLOW_WRITES` / `MANAGER_MCP_WRITES` hard-fail if set. Use the scoped vars instead.
 
 See [`.env.example`](.env.example). Prefer a secret manager for the API key in production configs.
 
-## Write scopes
+## Write scopes and task tools
 
-When a scope is listed in `MANAGER_MCP_WRITE_SCOPES`, the server registers `create_*` and `update_*` for every implemented resource in that domain. `MANAGER_MCP_DELETE_SCOPES` registers `delete_*` separately.
+When a scope is listed in `MANAGER_MCP_WRITE_SCOPES`, the server registers **task tools** for that domain plus deprecated CRUD twins. `MANAGER_MCP_DELETE_SCOPES` enables `void_document` and `delete_*` per domain.
 
-| Scope | Resources | Tools (when enabled) |
-|-------|-----------|----------------------|
-| `quotes` | sales_quotes, purchase_quotes | `create/update/delete_sales_quote`, `…_purchase_quote` |
-| `orders` | sales_orders, purchase_orders | `create/update/delete_sales_order`, `…_purchase_order` |
-| `parties` | customers, suppliers | `create/update/delete_customer`, `…_supplier` |
-| `items` | inventory_items, non_inventory_items | `create/update/delete_inventory_item`, `…_non_inventory_item` |
-| `sales` | sales_invoices, credit_notes, delivery_notes | `create/update/delete_sales_invoice`, `…_credit_note`, `…_delivery_note` |
-| `purchases` | purchase_invoices, debit_notes, goods_receipts | `create/update/delete_purchase_invoice`, `…_debit_note`, `…_goods_receipt` |
-| `banking` | receipts, payments, inter_account_transfers | `create/update/delete_receipt`, `…_payment`, `…_inter_account_transfer` |
-| `payroll` | employees, payslips, expense_claims | `create/update/delete_employee`, `…_payslip`, `…_expense_claim` |
-| `ledger` | journal_entries, depreciation_entries, amortization_entries | `create/update/delete_journal_entry`, `…_depreciation_entry`, `…_amortization_entry` |
+### Task tools (preferred)
 
-Bodies are opaque Manager-native JSON. Prefer **GET form → modify → PUT** (full-document replace). Example with only quotes enabled:
+| Tool | Scopes | Purpose |
+|------|--------|---------|
+| `create_customer`, `create_supplier` | parties | Single-resource party setup |
+| `issue_sales_invoice` | sales | Issue invoice with inline lines |
+| `issue_purchase_invoice` | purchases | Issue purchase invoice |
+| `issue_quote` | quotes | Issue sales or purchase quote |
+| `convert_quote_to_invoice` | quotes + sales | Convert quote to invoice |
+| `record_customer_payment` | banking | Receipt + invoice allocation |
+| `record_supplier_payment` | banking | Payment + invoice allocation |
+| `record_expense` | payroll and/or purchases | Expense claim or purchase invoice |
+| `transfer_between_accounts` | banking | Inter-account transfer |
+| `post_journal_entry` | ledger | Generic journal entry |
+| `void_document` | matching delete scope | Void by resource name + key |
+| `record_customer_deposit` | banking | Deposit before invoice exists |
+| `issue_deposit_invoice` | quotes | Deposit document (quote) |
+| `apply_deposit_to_invoice` | ledger | Apply deposit via journal |
+
+Bodies for composite tools use Manager-native JSON where noted. Clone `get_record` templates; do not invent field names.
+
+### Deprecated CRUD (0.2.0, removed 0.3.0)
+
+Per-resource `create_*` / `update_*` / `delete_*` still register when their domain scope is enabled. Descriptions are prefixed `[DEPRECATED in 0.2.0; use task tools]` except `create_customer` / `create_supplier`. Set `raw` in `MANAGER_MCP_WRITE_SCOPES` to register CRUD without deprecation prefixes.
+
+| Scope | Resources (CRUD when enabled) |
+|-------|-------------------------------|
+| `quotes` | sales_quotes, purchase_quotes |
+| `orders` | sales_orders, purchase_orders |
+| `parties` | customers, suppliers |
+| `items` | inventory_items, non_inventory_items |
+| `sales` | sales_invoices, credit_notes, delivery_notes |
+| `purchases` | purchase_invoices, debit_notes, goods_receipts |
+| `banking` | receipts, payments, inter_account_transfers, bank_accounts |
+| `payroll` | employees, payslips, expense_claims |
+| `ledger` | journal_entries, depreciation_entries, amortization_entries |
+
+Example with recommended scopes only:
 
 ```json
-"MANAGER_MCP_WRITE_SCOPES": "quotes",
-"MANAGER_MCP_DELETE_SCOPES": "quotes"
+"MANAGER_MCP_WRITE_SCOPES": "banking,sales,parties",
+"MANAGER_MCP_DELETE_SCOPES": "sales"
 ```
 
-→ `create_sales_quote`, `update_sales_quote`, `delete_sales_quote`, plus purchase twins.
+**Denylist (always blocked):** access-token forms, chart-of-accounts / `*-account-form` (except bank-or-cash), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields/buttons, themes, email templates/settings.
 
-**Denylist (always blocked):** access-token forms, chart-of-accounts / `*-account-form`, bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields/buttons, themes, email templates/settings.
+## Customer deposit workflow
+
+A **deposit is not revenue**. Money received before delivery must not be booked to an income account. Confirm tax/VAT treatment with your accountant.
+
+1. Ensure a **Customer deposits** bank/cash account exists in Manager (Settings → Bank and Cash Accounts).
+2. `record_customer_deposit` - posts cash to that account. If the account is missing, the tool returns `precondition_failed` with exact setup steps (Option A: guide only, no auto-create).
+3. `issue_deposit_invoice` (optional) - quote styled as a deposit document for the customer.
+4. `issue_sales_invoice` when the real invoice is raised.
+5. `apply_deposit_to_invoice` - journal entry moving deposit balance to the invoice (clone an existing journal via `get_record`).
+
+Required scopes: `banking`, `quotes` (deposit doc), `ledger` (apply), `sales` (final invoice via MCP).
+
+## Migration from 0.1.x
+
+- **0.2.0**: Task tools added; CRUD tools deprecated but still present under scopes.
+- **0.3.0**: CRUD tools removed (except `create_customer` / `create_supplier`). Use task tools or `raw` scope.
+- Update `MANAGER_MCP_WRITE_SCOPES` to the recommended narrow set above instead of enabling all domains.
 
 ## Tools
 
@@ -413,9 +465,9 @@ Bodies are opaque Manager-native JSON. Prefer **GET form → modify → PUT** (f
 
 | Tool | Purpose | Period (`from_date` / `to_date`) |
 |------|---------|----------------------------------|
-| `list_resources` | Discovery; reports `read_only` + live write/delete scopes | — |
-| `list_records` | Search/page a curated collection | — |
-| `get_record` | Fetch one record via `{path}-form/{key}` | — |
+| `list_resources` | Discovery; reports `read_only` + live write/delete scopes | n/a |
+| `list_records` | Search/page a curated collection | n/a |
+| `get_record` | Fetch one record via `{path}-form/{key}` | n/a |
 | `aged_receivables` | Outstanding / aging customers | Accepted; may be unsupported on this view |
 | `aged_payables` | Aging suppliers | Accepted; may be unsupported on this view |
 | `bank_balances` | Bank/cash **balances snapshot** | Accepted; may be unsupported on this view |
@@ -430,15 +482,15 @@ Collections for `list_records` / `get_record`: `customers`, `suppliers`, `sales_
 
 **Bank dual path (intentional):** `bank_balances` answers “what are my balances?”; `list_records` / `get_record` on `bank_accounts` answers “find account X and show detail.”
 
-### Write tools (opt-in)
+### Write tools (deprecated)
 
-Registered only for resources in enabled scopes. Pattern:
+Registered only for resources in enabled scopes. Prefer task tools above.
 
 | Pattern | Requires | Notes |
 |---------|----------|-------|
-| `create_{stem}` | write scope | POST form path; 201 includes `Key` |
-| `update_{stem}` | write scope | PUT `{form}/{key}`; full document replace |
-| `delete_{stem}` | delete scope | DELETE `{form}/{key}`; write scope alone is not enough |
+| `create_{stem}` | write scope | Deprecated in 0.2.0 |
+| `update_{stem}` | write scope | Deprecated in 0.2.0 |
+| `delete_{stem}` | delete scope | Deprecated in 0.2.0; use `void_document` |
 
 ## Agent Skill
 
@@ -465,10 +517,10 @@ GitHub Actions matrix: Python 3.10 and 3.12.
 ## Caveats
 
 - One process ↔ one `MANAGER_API_URL`. Multi-instance routing is out of scope.
-- Multi-business disambiguation on a shared host is **unverified** — do not claim multi-business support until validated against a live multi-business setup.
+- Multi-business disambiguation on a shared host is **unverified**. Do not claim multi-business support until validated against a live multi-business setup.
 - Vendored `src/manager_mcp/spec/api2.json` is provenance only; runtime always hits the live URL.
 - ChatGPT Apps need a hosted HTTP MCP endpoint. This package is stdio-only.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

@@ -23,3 +23,5 @@ jobs:
         run: uv run ruff check src tests
       - name: Pytest
         run: uv run pytest
+      - name: Sdist contents
+        run: uv run pytest tests/test_sdist_contents.py

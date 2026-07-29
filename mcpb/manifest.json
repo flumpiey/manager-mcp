@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.3",
   "name": "manager-mcp",
-  "version": "0.1.1",
-  "description": "MCP server for self-hosted Manager.io bookkeeping (read-only by default).",
+  "version": "0.2.0",
+  "description": "MCP server for Manager.io bookkeeping: read-first with opt-in scoped task and write tools.",
   "author": {
     "name": "flumpiey",
     "url": "https://github.com/flumpiey/manager-mcp"
@@ -17,8 +17,6 @@
     "mcp_config": {
       "command": "uvx",
       "args": [
-        "--from",
-        "git+https://github.com/flumpiey/manager-mcp",
         "manager-mcp"
       ],
       "env": {
@@ -47,7 +45,7 @@
     "write_scopes": {
       "type": "string",
       "title": "Write scopes",
-      "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger. Leave empty for read-only.",
+      "description": "Comma-separated domains for create/update: quotes,orders,parties,items,sales,purchases,banking,payroll,ledger,raw. Recommended: banking,sales,parties. Leave empty for read-only.",
       "required": false,
       "default": ""
     },

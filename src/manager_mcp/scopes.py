@@ -25,8 +25,12 @@ VALID_SCOPES = frozenset(
         "banking",
         "payroll",
         "ledger",
+        # Escape hatch: registers full CRUD set; effective_* expands to all domains.
+        "raw",
     }
 )
+
+DOMAIN_SCOPES = VALID_SCOPES - {"raw"}
 
 # resource_key -> scope
 RESOURCE_SCOPE: dict[str, str] = {
@@ -225,6 +229,18 @@ class WritePolicy:
     def any_enabled(self) -> bool:
         return bool(self.write_scopes or self.delete_scopes)
 
+    @property
+    def effective_write_scopes(self) -> frozenset[str]:
+        if "raw" in self.write_scopes:
+            return DOMAIN_SCOPES
+        return self.write_scopes - {"raw"}
+
+    @property
+    def effective_delete_scopes(self) -> frozenset[str]:
+        if "raw" in self.delete_scopes:
+            return DOMAIN_SCOPES
+        return self.delete_scopes - {"raw"}
+
     def authorize(self, method: str, path: str) -> None:
         method = method.upper()
         if method not in WRITE_METHODS:
@@ -240,12 +256,12 @@ class WritePolicy:
             )
         scope = RESOURCE_SCOPE[resource]
         if method == "DELETE":
-            if scope not in self.delete_scopes:
+            if scope not in self.effective_delete_scopes:
                 raise WritesDeniedError(
                     f"DELETE {path} requires scope {scope!r} in {DELETE_SCOPES_ENV}."
                 )
             return
-        if scope not in self.write_scopes:
+        if scope not in self.effective_write_scopes:
             raise WritesDeniedError(
                 f"{method} {path} requires scope {scope!r} in {WRITE_SCOPES_ENV}."
             )

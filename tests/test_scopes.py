@@ -67,3 +67,14 @@ def test_unmapped_path_denied() -> None:
 def test_from_env_unknown_scope() -> None:
     with pytest.raises(ScopeConfigError, match="unknown scope"):
         WritePolicy.from_env({"MANAGER_MCP_WRITE_SCOPES": "invoices"})
+
+
+def test_raw_scope_expands_effective_write() -> None:
+    policy = WritePolicy(write_scopes=frozenset({"raw"}), delete_scopes=frozenset())
+    assert "banking" in policy.effective_write_scopes
+    assert "quotes" in policy.effective_write_scopes
+    policy.authorize("POST", "/receipt-form")
+
+
+def test_raw_parses() -> None:
+    assert parse_scope_csv("raw,banking", env_name="X") == frozenset({"raw", "banking"})

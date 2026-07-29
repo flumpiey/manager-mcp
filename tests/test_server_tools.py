@@ -123,8 +123,8 @@ async def test_list_resources_reports_scopes(monkeypatch: pytest.MonkeyPatch) ->
     out = await _call("list_resources")
     assert out["read_only"] is False
     assert out["write_scopes"] == ["banking"]
-    assert "receipts" in out["boundary"].casefold()
-    assert "scoped writes enabled" in out["boundary"].casefold()
+    assert "record_customer_payment" in out["boundary"].casefold()
+    assert "effective_write" in out["boundary"].casefold()
 
 
 @pytest.mark.asyncio
