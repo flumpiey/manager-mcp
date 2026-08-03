@@ -9,6 +9,9 @@
 # Cursor IDE project config, rules, hooks, and skills
 .cursor/
 
+# Claude 
+.claude/
+
 # Agent skill packs and local agent assets
 .agents/
 

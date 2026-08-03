@@ -1,0 +1,3 @@
+INFO  2026-08-03 19:52:01,437 serena.cli:health_check:939 - Starting health check for project: E:\Development\manager-mcp
+INFO  2026-08-03 19:52:01,437 serena.cli:health_check:943 - Creating SerenaAgent with disabled dashboard...
+INFO  2026-08-03 19:52:01,438 serena.util.file_system:_load_gitignore_files:152 - Processing .gitignore file: E:\Development\manager-mcp\.serena\.gitignore
