@@ -98,7 +98,12 @@ async def issue_sales_invoice(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "sales")
     out = await _post(client, WRITABLE["sales_invoices"], fields)
-    return _envelope("ok", keys={"sales_invoice": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok",
+        keys={"sales_invoice": _body_key(out["body"])},
+        body=out["body"],
+        warnings=out["warnings"],
+    )
 
 
 async def issue_purchase_invoice(
@@ -108,7 +113,12 @@ async def issue_purchase_invoice(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "purchases")
     out = await _post(client, WRITABLE["purchase_invoices"], fields)
-    return _envelope("ok", keys={"purchase_invoice": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok",
+        keys={"purchase_invoice": _body_key(out["body"])},
+        body=out["body"],
+        warnings=out["warnings"],
+    )
 
 
 async def issue_quote(
@@ -122,7 +132,9 @@ async def issue_quote(
     resource = WRITABLE["purchase_quotes"] if purchase else WRITABLE["sales_quotes"]
     out = await _post(client, resource, fields)
     label = "purchase_quote" if purchase else "sales_quote"
-    return _envelope("ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"]
+    )
 
 
 async def convert_quote_to_invoice(
@@ -313,7 +325,9 @@ async def record_expense(
             "record_expense requires payroll and/or purchases in WRITE_SCOPES."
         )
     out = await _post(client, resource, fields)
-    return _envelope("ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"]
+    )
 
 
 async def transfer_between_accounts(
@@ -323,7 +337,9 @@ async def transfer_between_accounts(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "banking")
     out = await _post(client, WRITABLE["inter_account_transfers"], fields)
-    return _envelope("ok", keys={"transfer": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok", keys={"transfer": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"]
+    )
 
 
 async def post_journal_entry(
@@ -333,7 +349,12 @@ async def post_journal_entry(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "ledger")
     out = await _post(client, WRITABLE["journal_entries"], fields)
-    return _envelope("ok", keys={"journal_entry": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
+    return _envelope(
+        "ok",
+        keys={"journal_entry": _body_key(out["body"])},
+        body=out["body"],
+        warnings=out["warnings"],
+    )
 
 
 async def void_document(

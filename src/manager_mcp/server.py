@@ -10,24 +10,10 @@ import httpx
 from fastmcp import FastMCP
 from mcp.types import Icon
 
+from manager_mcp import task_tools as _tt
 from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
-from manager_mcp.task_tools import (
-    apply_deposit_to_invoice as _apply_deposit_to_invoice,
-    convert_quote_to_invoice as _convert_quote_to_invoice,
-    issue_deposit_invoice as _issue_deposit_invoice,
-    issue_purchase_invoice as _issue_purchase_invoice,
-    issue_quote as _issue_quote,
-    issue_sales_invoice as _issue_sales_invoice,
-    post_journal_entry as _post_journal_entry,
-    record_customer_deposit as _record_customer_deposit,
-    record_customer_payment as _record_customer_payment,
-    record_expense as _record_expense,
-    record_supplier_payment as _record_supplier_payment,
-    transfer_between_accounts as _transfer_between_accounts,
-    void_document as _void_document,
-)
 from manager_mcp.writable import WRITABLE, implemented_for_scope
 from manager_mcp.write_validate import diff_persisted, validate_write_body
 
@@ -479,7 +465,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def issue_sales_invoice(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _issue_sales_invoice(get_client(), get_policy(), fields)
+            return await _tt.issue_sales_invoice(get_client(), get_policy(), fields)
 
     if "purchases" in effective:
 
@@ -492,7 +478,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def issue_purchase_invoice(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _issue_purchase_invoice(get_client(), get_policy(), fields)
+            return await _tt.issue_purchase_invoice(get_client(), get_policy(), fields)
 
     if "quotes" in effective:
 
@@ -508,7 +494,7 @@ def register_task_tools() -> None:
             fields: dict[str, Any],
             purchase: bool = False,
         ) -> dict[str, Any]:
-            return await _issue_quote(get_client(), get_policy(), fields, purchase=purchase)
+            return await _tt.issue_quote(get_client(), get_policy(), fields, purchase=purchase)
 
         @mcp.tool(
             name="issue_deposit_invoice",
@@ -519,7 +505,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def issue_deposit_invoice(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _issue_deposit_invoice(get_client(), get_policy(), fields)
+            return await _tt.issue_deposit_invoice(get_client(), get_policy(), fields)
 
     if "quotes" in effective and "sales" in effective:
 
@@ -535,7 +521,7 @@ def register_task_tools() -> None:
             extra_fields: dict[str, Any] | None = None,
             purchase: bool = False,
         ) -> dict[str, Any]:
-            return await _convert_quote_to_invoice(
+            return await _tt.convert_quote_to_invoice(
                 get_client(),
                 get_policy(),
                 quote_key,
@@ -563,7 +549,7 @@ def register_task_tools() -> None:
             paid_by: int = 1,
             description: str | None = None,
         ) -> dict[str, Any]:
-            return await _record_customer_payment(
+            return await _tt.record_customer_payment(
                 get_client(),
                 get_policy(),
                 customer=customer,
@@ -594,7 +580,7 @@ def register_task_tools() -> None:
             paid_by: int = 1,
             description: str | None = None,
         ) -> dict[str, Any]:
-            return await _record_supplier_payment(
+            return await _tt.record_supplier_payment(
                 get_client(),
                 get_policy(),
                 supplier=supplier,
@@ -625,7 +611,7 @@ def register_task_tools() -> None:
             paid_by: int = 1,
             description: str | None = None,
         ) -> dict[str, Any]:
-            return await _record_customer_deposit(
+            return await _tt.record_customer_deposit(
                 get_client(),
                 get_policy(),
                 customer=customer,
@@ -643,7 +629,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def transfer_between_accounts(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _transfer_between_accounts(get_client(), get_policy(), fields)
+            return await _tt.transfer_between_accounts(get_client(), get_policy(), fields)
 
     if "payroll" in effective or "purchases" in effective:
 
@@ -659,7 +645,7 @@ def register_task_tools() -> None:
             fields: dict[str, Any],
             via: str = "auto",
         ) -> dict[str, Any]:
-            return await _record_expense(
+            return await _tt.record_expense(
                 get_client(), get_policy(), fields, via=via
             )
 
@@ -671,7 +657,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def post_journal_entry(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _post_journal_entry(get_client(), get_policy(), fields)
+            return await _tt.post_journal_entry(get_client(), get_policy(), fields)
 
         @mcp.tool(
             name="apply_deposit_to_invoice",
@@ -683,7 +669,7 @@ def register_task_tools() -> None:
             annotations=_WRITE_ANNOTATIONS,
         )
         async def apply_deposit_to_invoice(fields: dict[str, Any]) -> dict[str, Any]:
-            return await _apply_deposit_to_invoice(get_client(), get_policy(), fields)
+            return await _tt.apply_deposit_to_invoice(get_client(), get_policy(), fields)
 
     if policy.effective_delete_scopes:
 
@@ -696,7 +682,7 @@ def register_task_tools() -> None:
             annotations=_DELETE_ANNOTATIONS,
         )
         async def void_document(resource: str, key: str) -> dict[str, Any]:
-            return await _void_document(get_client(), get_policy(), resource, key)
+            return await _tt.void_document(get_client(), get_policy(), resource, key)
 
     _task_tools_registered = True
 

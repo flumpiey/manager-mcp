@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from manager_mcp.scopes import WRITE_METHODS, WritePolicy, WritesDeniedError
+from manager_mcp.scopes import WRITE_METHODS, WritePolicy
 
 BASE_QUERY_KEYS = frozenset(
     {"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"}
