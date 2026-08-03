@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.4] - 2026-08-03
+
+### Fixed
+
+- Claude Desktop extension: migrate MCPB to manifest 0.4 / `uv` server type and drop
+  system Python runtime check (uses `uvx`; only requires `uv` on PATH)
+
 ## [0.2.3] - 2026-08-03
 
 ### Added

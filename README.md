@@ -142,13 +142,13 @@ Restart Cursor after saving. Confirm `manager` under MCP settings.
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
-**Desktop Extension (`.mcpb`, shows branded icon):** from a clone:
+**Desktop Extension (`.mcpb`, shows branded icon):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases), or build from a clone:
 
 ```bash
 npx @anthropic-ai/mcpb pack mcpb
 ```
 
-Install the resulting `.mcpb` (double-click, drag onto Claude Desktop, or Settings → Extensions → Install Extension). Enter API URL and key when prompted; leave write/delete scopes empty for read-only. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`mcp_config` runs `uvx`).
+Install the `.mcpb` (double-click, drag onto Claude Desktop Settings → Extensions, or Settings → Extensions → Advanced settings → Install Extension). Enter API URL and key when prompted; leave write/delete scopes empty for read-only. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`uvx` pulls Python automatically; no separate Python install needed).
 
 **Manual `mcp.json` config:** edit the Claude Desktop config, then restart the app.
 
