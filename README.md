@@ -142,13 +142,21 @@ Restart Cursor after saving. Confirm `manager` under MCP settings.
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
-**Desktop Extension (`.mcpb`, shows branded icon):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases), or build from a clone:
+**Desktop Extension (`.mcpb`):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases). Use v0.2.4 or later (manifest 0.4; needs `uv` on PATH, not a separate Python install).
+
+1. Open Claude Desktop → **Settings → Extensions**.
+2. Open **Advanced settings** → **Install Extension…**
+3. Select `mcpb.mcpb`. Review permissions, enter **Manager API URL** and **Manager API key**, then click **Install**.
+4. Leave **Write scopes** and **Delete scopes** empty for read-only.
+5. Restart Claude Desktop if tools do not appear.
+
+Build your own bundle from a clone:
 
 ```bash
 npx @anthropic-ai/mcpb pack mcpb
 ```
 
-Install the `.mcpb` (double-click, drag onto Claude Desktop Settings → Extensions, or Settings → Extensions → Advanced settings → Install Extension). Enter API URL and key when prompted; leave write/delete scopes empty for read-only. Requires [`uv`](https://docs.astral.sh/uv/) on PATH (`uvx` pulls Python automatically; no separate Python install needed).
+On Windows, double-click often does nothing and dragging the file into chat attaches it to the conversation instead of installing it. Use **Install Extension…** in Settings.
 
 **Manual `mcp.json` config:** edit the Claude Desktop config, then restart the app.
 
