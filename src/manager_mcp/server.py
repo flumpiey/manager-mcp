@@ -15,41 +15,17 @@ from manager_mcp.resources import all_resources, extract_items, form_path, resol
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
 from manager_mcp.task_tools import (
     apply_deposit_to_invoice as _apply_deposit_to_invoice,
-)
-from manager_mcp.task_tools import (
     convert_quote_to_invoice as _convert_quote_to_invoice,
-)
-from manager_mcp.task_tools import (
     issue_deposit_invoice as _issue_deposit_invoice,
-)
-from manager_mcp.task_tools import (
     issue_purchase_invoice as _issue_purchase_invoice,
-)
-from manager_mcp.task_tools import (
     issue_quote as _issue_quote,
-)
-from manager_mcp.task_tools import (
     issue_sales_invoice as _issue_sales_invoice,
-)
-from manager_mcp.task_tools import (
     post_journal_entry as _post_journal_entry,
-)
-from manager_mcp.task_tools import (
     record_customer_deposit as _record_customer_deposit,
-)
-from manager_mcp.task_tools import (
     record_customer_payment as _record_customer_payment,
-)
-from manager_mcp.task_tools import (
     record_expense as _record_expense,
-)
-from manager_mcp.task_tools import (
     record_supplier_payment as _record_supplier_payment,
-)
-from manager_mcp.task_tools import (
     transfer_between_accounts as _transfer_between_accounts,
-)
-from manager_mcp.task_tools import (
     void_document as _void_document,
 )
 from manager_mcp.writable import WRITABLE, implemented_for_scope
@@ -484,11 +460,6 @@ def register_write_tools() -> None:
     _write_tools_registered = True
 
 
-def _task_enabled(policy: WritePolicy, *scopes: str) -> bool:
-    effective = policy.effective_write_scopes
-    return all(s in effective for s in scopes)
-
-
 def register_task_tools() -> None:
     """Register intent-shaped task tools when required write scopes are active."""
     global _task_tools_registered
@@ -550,7 +521,7 @@ def register_task_tools() -> None:
         async def issue_deposit_invoice(fields: dict[str, Any]) -> dict[str, Any]:
             return await _issue_deposit_invoice(get_client(), get_policy(), fields)
 
-    if _task_enabled(policy, "quotes", "sales"):
+    if "quotes" in effective and "sales" in effective:
 
         @mcp.tool(
             name="convert_quote_to_invoice",

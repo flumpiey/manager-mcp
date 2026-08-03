@@ -16,7 +16,12 @@ from manager_mcp.writable import WRITABLE, WritableResource
 from manager_mcp.write_validate import diff_persisted, validate_write_body
 
 
-def _ok(
+def _body_key(body: Any) -> str:
+    return body.get("Key", "") if isinstance(body, dict) else ""
+
+
+def _envelope(
+    status: str,
     *,
     keys: dict[str, str],
     body: Any = None,
@@ -24,27 +29,11 @@ def _ok(
     next_steps: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
-        "status": "ok",
+        "status": status,
         "keys": keys,
         "body": body,
         "warnings": warnings or [],
         "next_steps": next_steps or [],
-    }
-
-
-def _partial(
-    *,
-    keys: dict[str, str],
-    warnings: list[str],
-    next_steps: list[str],
-    body: Any = None,
-) -> dict[str, Any]:
-    return {
-        "status": "partial",
-        "keys": keys,
-        "body": body,
-        "warnings": warnings,
-        "next_steps": next_steps,
     }
 
 
@@ -109,8 +98,7 @@ async def issue_sales_invoice(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "sales")
     out = await _post(client, WRITABLE["sales_invoices"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(keys={"sales_invoice": key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={"sales_invoice": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def issue_purchase_invoice(
@@ -120,8 +108,7 @@ async def issue_purchase_invoice(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "purchases")
     out = await _post(client, WRITABLE["purchase_invoices"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(keys={"purchase_invoice": key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={"purchase_invoice": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def issue_quote(
@@ -134,9 +121,8 @@ async def issue_quote(
     require_write_scopes(policy, "quotes")
     resource = WRITABLE["purchase_quotes"] if purchase else WRITABLE["sales_quotes"]
     out = await _post(client, resource, fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
     label = "purchase_quote" if purchase else "sales_quote"
-    return _ok(keys={label: key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def convert_quote_to_invoice(
@@ -160,10 +146,10 @@ async def convert_quote_to_invoice(
     if extra_fields:
         fields.update(extra_fields)
     out = await _post(client, invoice_resource, fields)
-    inv_key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
     label = "purchase_invoice" if purchase else "sales_invoice"
-    return _ok(
-        keys={"quote": quote_key, label: inv_key},
+    return _envelope(
+        "ok",
+        keys={"quote": quote_key, label: _body_key(out["body"])},
         body=out["body"],
         warnings=out["warnings"],
     )
@@ -227,7 +213,8 @@ async def record_customer_payment(
     try:
         out = await _post(client, WRITABLE["receipts"], fields)
     except Exception as exc:
-        return _partial(
+        return _envelope(
+            "partial",
             keys={},
             warnings=[str(exc)],
             next_steps=[
@@ -235,9 +222,10 @@ async def record_customer_payment(
                 "record_customer_payment again with the same allocation."
             ],
         )
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
+    key = _body_key(out["body"])
     if not invoice_key:
-        return _partial(
+        return _envelope(
+            "partial",
             keys={"receipt": key},
             warnings=["No invoice_key supplied; receipt is unallocated."],
             next_steps=[
@@ -246,7 +234,8 @@ async def record_customer_payment(
             ],
             body=out["body"],
         )
-    return _ok(
+    return _envelope(
+        "ok",
         keys={"receipt": key, "invoice": invoice_key},
         body=out["body"],
         warnings=out["warnings"],
@@ -286,14 +275,15 @@ async def record_supplier_payment(
     try:
         out = await _post(client, WRITABLE["payments"], fields)
     except Exception as exc:
-        return _partial(
+        return _envelope(
+            "partial",
             keys={},
             warnings=[str(exc)],
             next_steps=["Fix payment body and retry record_supplier_payment."],
         )
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(
-        keys={"payment": key, "invoice": invoice_key},
+    return _envelope(
+        "ok",
+        keys={"payment": _body_key(out["body"]), "invoice": invoice_key},
         body=out["body"],
         warnings=out["warnings"],
     )
@@ -323,8 +313,7 @@ async def record_expense(
             "record_expense requires payroll and/or purchases in WRITE_SCOPES."
         )
     out = await _post(client, resource, fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(keys={label: key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def transfer_between_accounts(
@@ -334,8 +323,7 @@ async def transfer_between_accounts(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "banking")
     out = await _post(client, WRITABLE["inter_account_transfers"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(keys={"transfer": key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={"transfer": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def post_journal_entry(
@@ -345,8 +333,7 @@ async def post_journal_entry(
 ) -> dict[str, Any]:
     require_write_scopes(policy, "ledger")
     out = await _post(client, WRITABLE["journal_entries"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(keys={"journal_entry": key}, body=out["body"], warnings=out["warnings"])
+    return _envelope("ok", keys={"journal_entry": _body_key(out["body"])}, body=out["body"], warnings=out["warnings"])
 
 
 async def void_document(
@@ -364,7 +351,7 @@ async def void_document(
     require_delete_scope(policy, w.scope)
     path = f"{w.form_path}/{key}"
     body = await client.delete(path)
-    return _ok(keys={resource: key}, body=body)
+    return _envelope("ok", keys={resource: key}, body=body)
 
 
 async def record_customer_deposit(
@@ -413,9 +400,9 @@ async def record_customer_deposit(
         description=description or "Customer deposit (not revenue)",
     )
     out = await _post(client, WRITABLE["receipts"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(
-        keys={"receipt": key, "deposit_account": deposit_account},
+    return _envelope(
+        "ok",
+        keys={"receipt": _body_key(out["body"]), "deposit_account": deposit_account},
         body=out["body"],
         warnings=out["warnings"],
         next_steps=[
@@ -436,9 +423,9 @@ async def issue_deposit_invoice(
     if "deposit" not in desc.casefold():
         body["Description"] = (desc + " - Deposit invoice (not revenue)").strip(" -")
     out = await _post(client, WRITABLE["sales_quotes"], body)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(
-        keys={"sales_quote": key},
+    return _envelope(
+        "ok",
+        keys={"sales_quote": _body_key(out["body"])},
         body=out["body"],
         warnings=out["warnings"],
         next_steps=[
@@ -456,9 +443,9 @@ async def apply_deposit_to_invoice(
     """Post a journal entry moving deposit balance to the sales invoice / AR."""
     require_write_scopes(policy, "ledger")
     out = await _post(client, WRITABLE["journal_entries"], fields)
-    key = (out["body"] or {}).get("Key", "") if isinstance(out["body"], dict) else ""
-    return _ok(
-        keys={"journal_entry": key},
+    return _envelope(
+        "ok",
+        keys={"journal_entry": _body_key(out["body"])},
         body=out["body"],
         warnings=out["warnings"],
         next_steps=["Verify invoice balance and customer available credit with reads."],

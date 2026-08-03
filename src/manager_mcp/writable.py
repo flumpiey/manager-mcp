@@ -436,9 +436,5 @@ WRITABLE: dict[str, WritableResource] = {
 }
 
 
-def writable(name: str) -> WritableResource | None:
-    return WRITABLE.get(name)
-
-
 def implemented_for_scope(scope: str) -> list[WritableResource]:
     return [w for w in WRITABLE.values() if w.scope == scope and w.implemented]

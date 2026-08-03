@@ -148,6 +148,4 @@ __all__ = [
     "ManagerApiError",
     "ManagerClient",
     "ManagerUnavailableError",
-    "WRITE_METHODS",
-    "WritesDeniedError",
 ]
