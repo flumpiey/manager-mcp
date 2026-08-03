@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.6] - 2026-08-03
+
+### Fixed
+
+- Claude Desktop runtime: use `uv tool run manager-mcp` in mcpb mcp_config.
+  Claude maps `server.type: uv` to `uv.exe` and was running `uv manager-mcp`
+  instead of `uvx manager-mcp`.
+
 ## [0.2.5] - 2026-08-03
 
 ### Fixed

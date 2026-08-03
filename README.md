@@ -142,7 +142,7 @@ Restart Cursor after saving. Confirm `manager` under MCP settings.
 <details>
 <summary><strong>Claude Desktop</strong></summary>
 
-**Desktop Extension (`.mcpb`):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases). Use v0.2.5 or later.
+**Desktop Extension (`.mcpb`):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases). Use **v0.2.6** or later.
 
 1. Open Claude Desktop → **Settings → Extensions**.
 2. Open **Advanced settings** → **Install Extension…**

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "manager-mcp"
-version = "0.2.5"
+version = "0.2.6"
 description = "MCP server for Manager.io bookkeeping: read-first with opt-in scoped task and write tools"
 readme = "README.md"
 license = "MIT"
