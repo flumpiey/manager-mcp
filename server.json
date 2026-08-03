@@ -7,14 +7,14 @@
     "url": "https://github.com/flumpiey/manager-mcp",
     "source": "github"
   },
-  "version": "0.2.4",
+  "version": "0.2.5",
   "websiteUrl": "https://github.com/flumpiey/manager-mcp",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "manager-mcp",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

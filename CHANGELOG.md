@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.5] - 2026-08-03
+
+### Fixed
+
+- Claude Desktop extension install on Windows: drop manager-mcp from mcpb
+  pyproject dependencies (install ran uv sync and failed on cffi without win
+  wheels). Runtime still uses uvx; add mcpb/.mcpbignore for .venv and uv.lock.
+
 ## [0.2.4] - 2026-08-03
 
 ### Fixed
