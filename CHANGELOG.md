@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.3] - 2026-08-03
+
+### Added
+
+- Claude Desktop extension pack (`mcpb.mcpb`) for one-click install via Claude Desktop
+- Serena project config (`.serena/`) for symbol-aware agent editing
+
+### Changed
+
+- Refactor: reduce complexity from ponytail audit (-56 lines)
+
+### Fixed
+
+- CI: resolve ruff lint failures from refactor commit (F401, I001, E501)
+
 ## [0.2.0] - 2026-07-29
 
 ### Added
