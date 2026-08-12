@@ -10,6 +10,7 @@ CORE_COLLECTIONS = {
     "sales_invoices",
     "purchase_invoices",
     "chart_of_accounts",
+    "divisions",
     "bank_accounts",
 }
 # Synced from writable.py so create_* results can be verified via get_record.
@@ -65,6 +66,7 @@ def test_form_path_collections() -> None:
     assert form_path("sales_invoices", "x") == "/sales-invoice-form/x"
     assert form_path("purchase_invoices", "x") == "/purchase-invoice-form/x"
     assert form_path("bank_accounts", "k1") == "/bank-or-cash-account-form/k1"
+    assert form_path("divisions", "d1") == "/division-form/d1"
     assert form_path("receipts", "r1") == "/receipt-form/r1"
     assert form_path("payments", "p1") == "/payment-form/p1"
 
@@ -93,6 +95,21 @@ def test_bank_dual_descriptions() -> None:
     assert accounts is not None and balances is not None
     assert "bank_balances" in accounts.description
     assert "bank_accounts" in balances.description
+
+
+def test_divisions_live_envelope() -> None:
+    """Envelope shape confirmed against Manager 26.7.14.3656 (empty business)."""
+    desc = resolve("divisions")
+    assert desc is not None
+    assert desc.path == "/divisions"
+    body = {
+        "business": {"name": "b"},
+        "skip": 0,
+        "pageSize": 5,
+        "totalRecords": 2,
+        "divisions": [{"key": "d1", "name": "Retail"}, {"key": "d2", "name": "Service"}],
+    }
+    assert len(extract_items(desc, body)) == 2
 
 
 def test_extract_items_envelope() -> None:

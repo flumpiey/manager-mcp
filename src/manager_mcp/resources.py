@@ -76,6 +76,15 @@ _BASE_RESOURCES: dict[str, ResourceDescriptor] = {
         form_template=None,
         items_key="chartOfAccounts",
     ),
+    "divisions": _collection(
+        "divisions",
+        "/divisions",
+        "Divisions collection (departments/segments; resolve a key for a "
+        "transaction line's Division field. List/get only - divisions are "
+        "setup data)",
+        form_template="/division-form/{key}",
+        items_key="divisions",
+    ),
     "bank_accounts": _collection(
         "bank_accounts",
         "/bank-and-cash-accounts",
