@@ -15,7 +15,7 @@ from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
 from manager_mcp.writable import WRITABLE, implemented_for_scope
-from manager_mcp.write_validate import diff_persisted, normalize_write_body, validate_write_body
+from manager_mcp.write_validate import normalize_write_body, validate_write_body
 
 _PERIOD_ALIASES = {
     "from_date": "fromDate",
@@ -100,10 +100,10 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
     requested = {k: v for k, v in period.items() if v is not None and v != ""}
     unsupported = bool(requested) and not desc.date_params
     forward = _normalize_period(period, desc.date_params)
-    client = get_client()
-    client._extra_query_keys = frozenset(desc.date_params)
     try:
-        body = await client.get(desc.path, params=forward or None)
+        body = await get_client().get(
+            desc.path, params=forward or None, extra_keys=frozenset(desc.date_params)
+        )
     except httpx.HTTPStatusError as exc:
         raise RuntimeError(f"Manager HTTP {exc.response.status_code} for {name}") from exc
     result: dict[str, Any] = {
@@ -300,37 +300,12 @@ async def tax_summary(
     return await _fetch_report("tax_summary", from_date=from_date, to_date=to_date)
 
 
-async def _persist_and_verify(
-    resource_name: str,
-    fields: dict[str, Any],
-    body: Any,
-) -> dict[str, Any]:
-    w = WRITABLE[resource_name]
-    result: dict[str, Any] = {"resource": resource_name, "body": body, "warnings": []}
-    if not w.known_keys or not isinstance(body, dict):
-        return result
-    key = body.get("Key") or body.get("key")
-    if not key:
-        result["warnings"] = ["create/update response had no Key; could not verify"]
-        return result
-    persisted = await get_client().get(f"{w.form_path}/{key}")
-    form = persisted if isinstance(persisted, dict) else None
-    result["warnings"] = diff_persisted(w, fields, form)
-    result["verified"] = persisted
-    return result
-
-
 def _make_create_tool(resource_name: str) -> Any:
     w = WRITABLE[resource_name]
     stem = w.tool_stem
 
     async def _create(fields: dict[str, Any]) -> dict[str, Any]:
-        validate_write_body(w, fields, creating=True)
-        payload = normalize_write_body(w, fields)
-        body = await get_client().post(w.form_path, json=payload)
-        if w.known_keys:
-            return await _persist_and_verify(resource_name, payload, body)
-        return {"resource": resource_name, "body": body}
+        return {"resource": resource_name, **await _tt._post(get_client(), w, fields)}
 
     _create.__name__ = f"create_{stem}"
     notes = f" {w.create_notes}" if w.create_notes else ""
@@ -348,13 +323,10 @@ def _make_update_tool(resource_name: str) -> Any:
     async def _update(key: str, fields: dict[str, Any]) -> dict[str, Any]:
         validate_write_body(w, fields, creating=False)
         payload = normalize_write_body(w, fields)
-        path = f"{w.form_path}/{key}"
-        body = await get_client().put(path, json=payload)
-        if w.known_keys:
-            out = await _persist_and_verify(resource_name, payload, body or {"Key": key})
-            out["key"] = key
-            return out
-        return {"resource": resource_name, "key": key, "body": body}
+        client = get_client()
+        body = await client.put(f"{w.form_path}/{key}", json=payload)
+        warnings = await _tt._verify(client, w, payload, body or {"Key": key})
+        return {"resource": resource_name, "key": key, "body": body, "warnings": warnings}
 
     _update.__name__ = f"update_{stem}"
     _update.__doc__ = (
@@ -579,7 +551,7 @@ def register_task_tools() -> None:
             amount: float,
             invoice_key: str,
             reference: str | None = None,
-            paid_by: int = 1,
+            paid_by: int = 2,
             description: str | None = None,
         ) -> dict[str, Any]:
             return await _tt.record_supplier_payment(

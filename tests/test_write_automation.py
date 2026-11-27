@@ -6,8 +6,6 @@ import httpx
 import pytest
 import respx
 
-from manager_mcp.client import ManagerClient
-from manager_mcp.scopes import WritePolicy
 from manager_mcp.server import _make_create_tool, reset_client
 from manager_mcp.writable import WRITABLE
 from manager_mcp.write_validate import normalize_write_body, validate_write_body
@@ -75,11 +73,3 @@ async def test_create_custom_button_happy_path() -> None:
     assert out["body"]["Key"] == key
     assert out["warnings"] == []
 
-
-def test_client_api4_base_derived() -> None:
-    client = ManagerClient(
-        "http://127.0.0.1:55339/api2",
-        "k",
-        policy=WritePolicy(frozenset({"automation"}), frozenset()),
-    )
-    assert client.api4_base_url == "http://127.0.0.1:55339/api4"

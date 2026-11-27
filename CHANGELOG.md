@@ -8,13 +8,31 @@ All notable changes to this project are documented in this file.
 
 - `automation` write/delete scope for custom buttons (API2 `/custom-buttons`,
   `/custom-button-form`) with field validation and persistence warnings.
-- Optional `MANAGER_API4_URL` / `ManagerClient.api4_base_url` for future API4
-  calls (CRUD uses API2 on v1).
 
 ### Changed
 
 - Custom button paths are no longer globally denylisted; they require the
   `automation` scope instead. Custom field definition paths remain blocked.
+- `record_customer_deposit` matches a bank/cash account named exactly
+  "Customer deposits" (was: any name containing "deposit").
+- `record_expense` raises when `via` names a route whose scope is missing,
+  and rejects unknown `via` values.
+- Write errors raise instead of returning `partial` with no key. A failed
+  read-back after a save returns a warning with the saved key.
+
+### Fixed
+
+- `record_supplier_payment` sent `Payee=1` (customer) by default; now `2`.
+- Supplier payments resolve Accounts payable from the chart of accounts first,
+  and only reuse a past payment line that carries `AccountsPayableSupplier`.
+- Record keys containing `.`, `..`, `%` or `\` path segments are rejected
+  before any request.
+- `server.json` and the mcpb manifest now carry the package version.
+
+### Removed
+
+- Unused API4 client helper (`MANAGER_API4_URL`, `MANAGER_BUSINESS_NAME`).
+- One-off probe and smoke scripts under `scripts/`.
 
 ## [0.2.6] - 2026-08-03
 

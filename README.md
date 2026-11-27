@@ -21,7 +21,7 @@
 - **Task tools.** Intent-shaped writes such as `record_customer_payment` (receipt plus invoice allocation) instead of raw form posts.
 - **Hard denylist.** Access tokens, chart of accounts forms, tax codes, currencies, exchange rates, starting balances, bank reconciliation, custom field definitions, themes and email settings stay blocked even with writes on.
 - **Fail-loud configuration.** Unknown scopes, wildcards (`*`, `all`) and the legacy `MANAGER_MCP_ALLOW_WRITES` style variables stop the server at start-up.
-- **Customer deposit workflow.** Deposits post to a deposit bank or cash account, never to income. A missing account returns `precondition_failed` with setup steps.
+- **Customer deposit workflow.** Deposits post to a deposit bank or cash account, never to income. The server looks for an account named exactly "Customer deposits", or you pass `bank_account`. A missing account returns `precondition_failed` with setup steps.
 - **Packaged for hosts.** PyPI package for `uvx`, a Claude Desktop extension (`.mcpb`), a Cursor plugin and an entry in the MCP Registry as `io.github.flumpiey/manager-mcp`.
 - **Companion agent skill.** [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md) tells the model to call `list_resources` first and to verify after writes.
 
@@ -112,8 +112,6 @@ mcpServers:
 | `MANAGER_API_KEY` | yes | none | Access token, sent as the `X-API-KEY` header. |
 | `MANAGER_MCP_WRITE_SCOPES` | no | empty (read-only) | Comma-separated domains that get create and update tools. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | empty | Comma-separated domains that get delete tools and `void_document`. |
-| `MANAGER_API4_URL` | no | `MANAGER_API_URL` with `/api2` replaced by `/api4` | API4 base for the client's API4 helper. No current tool calls API4. |
-| `MANAGER_BUSINESS_NAME` | no | empty | `business` query value for API4 calls. No current tool calls API4. |
 | `TEST_MANAGER_API_URL` | integration tests only | none | Sandbox business URL for `pytest -m integration`. |
 | `TEST_MANAGER_API_KEY` | integration tests only | none | Sandbox business token for `pytest -m integration`. |
 

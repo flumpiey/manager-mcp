@@ -117,3 +117,68 @@ def test_crud_no_deprecation_with_raw() -> None:
 
     policy = WritePolicy(frozenset({"raw"}), frozenset())
     assert _deprecation_prefix(policy, "receipt") == ""
+
+
+def _capture_task_tools(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    captured: dict[str, object] = {}
+
+    def fake_tool(*_args: object, **kwargs: object):
+        def deco(fn: object) -> object:
+            captured[str(kwargs.get("name"))] = fn
+            return fn
+
+        return deco
+
+    monkeypatch.setattr(mcp, "tool", fake_tool)
+    register_task_tools()
+    return captured
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_supplier_payment_wrapper_uses_supplier_payee_and_ap_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = "22222222-2222-2222-2222-222222222222"
+    respx.get(f"{BASE}/chart-of-accounts").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "chartOfAccounts": [
+                    {"Key": "fees-acct", "Name": "Bank charges"},
+                    {"Key": "ap-acct", "Name": "Accounts payable"},
+                ]
+            },
+        )
+    )
+    post = respx.post(f"{BASE}/payment-form").mock(
+        return_value=httpx.Response(201, json={"Key": key})
+    )
+    respx.get(f"{BASE}/payment-form/{key}").mock(
+        return_value=httpx.Response(500, text="boom")
+    )
+    tools = _capture_task_tools(monkeypatch)
+    out = await tools["record_supplier_payment"](
+        supplier="sup-guid",
+        bank_account="bank-guid",
+        date="2026-07-13",
+        amount=50.0,
+        invoice_key="pinv-guid",
+    )
+    sent = __import__("json").loads(post.calls.last.request.content)
+    assert sent["Payee"] == 2
+    assert sent["Lines"][0]["Account"] == "ap-acct"
+    # Read-back failed after a save: keep the key, warn, do not ask for a retry.
+    assert out["keys"]["payment"] == key
+    assert any("do not retry" in w for w in out["warnings"])
+
+
+@pytest.mark.asyncio
+async def test_record_expense_refuses_missing_requested_route() -> None:
+    from manager_mcp.task_tools import record_expense
+
+    policy = WritePolicy(frozenset({"purchases"}), frozenset())
+    with pytest.raises(WritesDeniedError, match="payroll"):
+        await record_expense(None, policy, {"Date": "2026-07-13"}, via="expense_claim")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="via must be"):
+        await record_expense(None, policy, {}, via="bogus")  # type: ignore[arg-type]
