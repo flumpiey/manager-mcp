@@ -145,3 +145,14 @@ async def test_get_filters_query_params() -> None:
     assert route.calls.last.request.url.params.get("term") == "x"
     assert "inject" not in route.calls.last.request.url.params
     await client.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "key", ["../access-token-form", "x/./y", "..%2Faccess-token-form", r"a\b"]
+)
+async def test_path_traversal_keys_rejected(key: str) -> None:
+    client = ManagerClient("http://example.test/api2", "secret")
+    with pytest.raises(ValueError, match="Invalid path or key"):
+        await client.get(f"/customer-form/{key}")
+    await client.aclose()

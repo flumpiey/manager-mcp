@@ -1,4 +1,4 @@
-"""PreconditionResult shape and deposit precondition behaviour."""
+"""Deposit precondition behaviour."""
 
 from __future__ import annotations
 
@@ -6,11 +6,6 @@ import httpx
 import pytest
 import respx
 
-from manager_mcp.preconditions import (
-    PreconditionItem,
-    PreconditionResult,
-    precondition_failed_response,
-)
 from manager_mcp.scopes import WritePolicy
 from manager_mcp.server import reset_client
 from manager_mcp.task_tools import record_customer_deposit
@@ -29,20 +24,6 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> None:
     reset_client()
     yield
     reset_client()
-
-
-def test_precondition_result_to_dict() -> None:
-    item = PreconditionItem(
-        name="deposit_bank_account",
-        why="Deposits are not revenue.",
-        how_to_create="Create a Customer deposits bank account in Manager.",
-    )
-    result = PreconditionResult(ok=False, missing=(item,))
-    payload = precondition_failed_response(result)
-    assert payload["status"] == "precondition_failed"
-    assert payload["preconditions"]["ok"] is False
-    assert len(payload["preconditions"]["missing"]) == 1
-    assert "Create a Customer deposits" in payload["next_steps"][0]
 
 
 @pytest.mark.asyncio
@@ -116,3 +97,21 @@ async def test_record_customer_deposit_happy_path() -> None:
     await client.aclose()
     assert out["status"] == "ok"
     assert out["keys"]["receipt"] == "rcpt-1"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_deposit_account_needs_exact_name() -> None:
+    respx.get(f"{BASE}/bank-and-cash-accounts").mock(
+        return_value=httpx.Response(
+            200, json={"bankAndCashAccounts": [{"Key": "fd", "Name": "Fixed Deposit"}]}
+        )
+    )
+    from manager_mcp.client import ManagerClient
+
+    client = ManagerClient(BASE, "k", policy=WritePolicy(frozenset({"banking"}), frozenset()))
+    out = await record_customer_deposit(
+        client, client.policy, customer="c", amount=1.0, date="2026-07-29"
+    )
+    await client.aclose()
+    assert out["status"] == "precondition_failed"

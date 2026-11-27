@@ -2,19 +2,54 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-11-27
+
+### Removed
+
+- `create_*` and `delete_*` tools for documents that task tools cover (sales and
+  purchase invoices, sales and purchase quotes, receipts, payments,
+  inter-account transfers, journal entries, expense claims). Use the task tools
+  and `void_document`, or set the `raw` scope to restore them. `update_*` tools
+  and CRUD for all other resources remain.
+
+### Changed
+
+- Remaining CRUD tools no longer carry the `[DEPRECATED in 0.2.0]` prefix.
+- Every create and update now reads the record back. Resources without a known
+  field list warn on any submitted field that Manager dropped (Manager 26.8
+  returns 201 for unknown field names).
+
 ## [0.2.7] - 2026-10-29
 
 ### Added
 
 - `automation` write/delete scope for custom buttons (API2 `/custom-buttons`,
   `/custom-button-form`) with field validation and persistence warnings.
-- Optional `MANAGER_API4_URL` / `ManagerClient.api4_base_url` for future API4
-  calls (CRUD uses API2 on v1).
 
 ### Changed
 
 - Custom button paths are no longer globally denylisted; they require the
   `automation` scope instead. Custom field definition paths remain blocked.
+- `record_customer_deposit` matches a bank/cash account named exactly
+  "Customer deposits" (was: any name containing "deposit").
+- `record_expense` raises when `via` names a route whose scope is missing,
+  and rejects unknown `via` values.
+- Write errors raise instead of returning `partial` with no key. A failed
+  read-back after a save returns a warning with the saved key.
+
+### Fixed
+
+- `record_supplier_payment` sent `Payee=1` (customer) by default; now `2`.
+- Supplier payments resolve Accounts payable from the chart of accounts first,
+  and only reuse a past payment line that carries `AccountsPayableSupplier`.
+- Record keys containing `.`, `..`, `%` or `\` path segments are rejected
+  before any request.
+- `server.json` and the mcpb manifest now carry the package version.
+
+### Removed
+
+- Unused API4 client helper (`MANAGER_API4_URL`, `MANAGER_BUSINESS_NAME`).
+- One-off probe and smoke scripts under `scripts/`.
 
 ## [0.2.6] - 2026-08-03
 

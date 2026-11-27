@@ -73,7 +73,7 @@ Registered when required scopes are in `effective_write_scopes`:
 With `automation` scope: `create_custom_button`, `update_custom_button`,
 `delete_custom_button` (no `invoke_custom_button`; see research-writes-automation.md).
 
-Per-resource CRUD is **deprecated in 0.2.0** (removed in 0.3.0). Use task tools unless `raw` scope is set.
+Since 0.3.0, `create_*` and `delete_*` for documents that task tools cover (invoices, quotes, receipts, payments, transfers, journal entries, expense claims) register only with the `raw` scope. Use the task tools and `void_document` instead. `update_*` and CRUD for other resources stay.
 
 ## Verify after write
 

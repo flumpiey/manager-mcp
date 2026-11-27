@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 
-from manager_mcp.scopes import WRITE_METHODS, WRITE_SCOPES_ENV, WritePolicy, WritesDeniedError
+from manager_mcp.scopes import WRITE_METHODS, WritePolicy
 
 BASE_QUERY_KEYS = frozenset({"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"})
 
@@ -34,7 +33,6 @@ class ManagerClient:
         api_key: str,
         *,
         client: httpx.AsyncClient | None = None,
-        extra_query_keys: frozenset[str] | None = None,
         policy: WritePolicy | None = None,
     ) -> None:
         if not base_url or not base_url.strip():
@@ -43,8 +41,6 @@ class ManagerClient:
             raise ConfigError("MANAGER_API_KEY is required")
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key.strip()
-        self._api4_base_url = self._derive_api4_base(self.base_url)
-        self._extra_query_keys = extra_query_keys or frozenset()
         self.policy = policy or WritePolicy(frozenset(), frozenset())
         self._owns_client = client is None
         self._client = client or httpx.AsyncClient(
@@ -53,74 +49,25 @@ class ManagerClient:
             timeout=60.0,
         )
 
-    @staticmethod
-    def _derive_api4_base(api2_base: str) -> str:
-        explicit = os.environ.get("MANAGER_API4_URL", "").strip()
-        if explicit:
-            return explicit.rstrip("/")
-        parsed = urlparse(api2_base)
-        path = parsed.path.rstrip("/")
-        if path.casefold().endswith("/api2"):
-            path = path[: -len("/api2")] + "/api4"
-        else:
-            path = f"{path}/api4"
-        return f"{parsed.scheme}://{parsed.netloc}{path}"
-
-    @property
-    def api4_base_url(self) -> str:
-        return self._api4_base_url
-
-    async def post_api4(
-        self,
-        path: str,
-        *,
-        json: Any = None,
-        business: str | None = None,
-    ) -> Any:
-        """POST to API4 (optional; custom buttons use API2 form CRUD in v1)."""
-        if "automation" not in self.policy.effective_write_scopes:
-            raise WritesDeniedError(
-                f"POST API4 {path} requires scope 'automation' in {WRITE_SCOPES_ENV}."
-            )
-        url_path = path if path.startswith("/") else f"/{path}"
-        params: dict[str, Any] = {}
-        business_name = business or os.environ.get("MANAGER_BUSINESS_NAME", "").strip()
-        if business_name:
-            params["business"] = business_name
-        try:
-            response = await self._client.request(
-                "POST",
-                f"{self._api4_base_url}{url_path}",
-                params=params or None,
-                json=json,
-            )
-        except httpx.RequestError as exc:
-            raise ManagerUnavailableError(
-                f"Manager.io API4 is not reachable at {self._api4_base_url}. Detail: {exc}"
-            ) from exc
-        response.raise_for_status()
-        if not response.content:
-            return None
-        return response.json()
-
     @classmethod
     def from_env(
         cls,
         *,
-        extra_query_keys: frozenset[str] | None = None,
         policy: WritePolicy | None = None,
     ) -> ManagerClient:
         return cls(
             os.environ.get("MANAGER_API_URL", ""),
             os.environ.get("MANAGER_API_KEY", ""),
-            extra_query_keys=extra_query_keys,
             policy=policy if policy is not None else WritePolicy.from_env(),
         )
 
-    def clean_params(self, params: dict[str, Any] | None) -> dict[str, Any]:
+    @staticmethod
+    def clean_params(
+        params: dict[str, Any] | None, extra_keys: frozenset[str] = frozenset()
+    ) -> dict[str, Any]:
         if not params:
             return {}
-        allowed = BASE_QUERY_KEYS | self._extra_query_keys
+        allowed = BASE_QUERY_KEYS | extra_keys
         return {k: v for k, v in params.items() if k in allowed and v is not None}
 
     async def get(
@@ -128,8 +75,9 @@ class ManagerClient:
         path: str,
         *,
         params: dict[str, Any] | None = None,
+        extra_keys: frozenset[str] = frozenset(),
     ) -> Any:
-        return await self._send("GET", path, params=params)
+        return await self._send("GET", path, params=self.clean_params(params, extra_keys))
 
     async def post(self, path: str, *, json: Any = None) -> Any:
         return await self._send("POST", path, json=json)
@@ -153,20 +101,28 @@ class ManagerClient:
     ) -> Any:
         method = method.upper()
         url_path = path if path.startswith("/") else f"/{path}"
+        # Keys from the model land in the path; block traversal to unlisted endpoints.
+        if any(seg in {".", ".."} or "%" in seg or "\\" in seg for seg in url_path.split("/")):
+            raise ValueError(f"Invalid path or key: {url_path!r}")
         if method in WRITE_METHODS:
             self.policy.authorize(method, url_path)
         try:
             response = await self._client.request(
                 method,
                 url_path,
-                params=self.clean_params(params) if method == "GET" else None,
+                params=params or None,
                 json=json,
             )
         except httpx.RequestError as exc:
             # Keep MCP alive when Manager desktop/API is closed.
+            hint = (
+                " The write may have saved: check with list_records before any retry."
+                if method in WRITE_METHODS
+                else ""
+            )
             raise ManagerUnavailableError(
                 f"Manager.io is not reachable at {self.base_url}. "
-                "Ask the user to open Manager (with API enabled) and retry. "
+                f"Ask the user to open Manager (with API enabled) and retry.{hint} "
                 f"Detail: {exc}"
             ) from exc
         try:

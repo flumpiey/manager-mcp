@@ -15,7 +15,7 @@ from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
 from manager_mcp.writable import WRITABLE, implemented_for_scope
-from manager_mcp.write_validate import diff_persisted, normalize_write_body, validate_write_body
+from manager_mcp.write_validate import normalize_write_body, validate_write_body
 
 _PERIOD_ALIASES = {
     "from_date": "fromDate",
@@ -56,7 +56,20 @@ _policy: WritePolicy | None = None
 _write_tools_registered = False
 _task_tools_registered = False
 
-_CRUD_EXEMPT_FROM_DEPRECATION = frozenset({"customer", "supplier"})
+# Task tools create these, and void_document deletes them; raw restores create_*/delete_*.
+_TASK_COVERED = frozenset(
+    {
+        "sales_invoices",
+        "purchase_invoices",
+        "sales_quotes",
+        "purchase_quotes",
+        "receipts",
+        "payments",
+        "inter_account_transfers",
+        "journal_entries",
+        "expense_claims",
+    }
+)
 
 
 def get_policy() -> WritePolicy:
@@ -100,10 +113,10 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
     requested = {k: v for k, v in period.items() if v is not None and v != ""}
     unsupported = bool(requested) and not desc.date_params
     forward = _normalize_period(period, desc.date_params)
-    client = get_client()
-    client._extra_query_keys = frozenset(desc.date_params)
     try:
-        body = await client.get(desc.path, params=forward or None)
+        body = await get_client().get(
+            desc.path, params=forward or None, extra_keys=frozenset(desc.date_params)
+        )
     except httpx.HTTPStatusError as exc:
         raise RuntimeError(f"Manager HTTP {exc.response.status_code} for {name}") from exc
     result: dict[str, Any] = {
@@ -122,8 +135,8 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
 @mcp.tool(
     description=(
         "List curated Manager.io capabilities. Default is read-only (10 tools). "
-        "Task tools register when write scopes match; CRUD tools are deprecated "
-        "unless raw scope is set."
+        "Task tools register when write scopes match. create_*/delete_* for documents "
+        "that task tools cover register only with the raw scope."
     )
 )
 async def list_resources() -> dict[str, Any]:
@@ -151,8 +164,8 @@ async def list_resources() -> dict[str, Any]:
         boundary = (
             "Scoped writes enabled. Prefer task tools (issue_sales_invoice, "
             "record_customer_payment, record_customer_deposit, …). "
-            "Per-resource CRUD is deprecated in 0.2.0 (removed in 0.3.0) unless "
-            "raw is in WRITE_SCOPES. write_scopes="
+            "create_*/delete_* for task-covered documents need raw in WRITE_SCOPES; "
+            "use void_document to delete. write_scopes="
             f"{write_scopes}; effective_write={effective_write}; "
             f"delete_scopes={delete_scopes}. Verify writes with list_records/get_record."
         )
@@ -300,37 +313,12 @@ async def tax_summary(
     return await _fetch_report("tax_summary", from_date=from_date, to_date=to_date)
 
 
-async def _persist_and_verify(
-    resource_name: str,
-    fields: dict[str, Any],
-    body: Any,
-) -> dict[str, Any]:
-    w = WRITABLE[resource_name]
-    result: dict[str, Any] = {"resource": resource_name, "body": body, "warnings": []}
-    if not w.known_keys or not isinstance(body, dict):
-        return result
-    key = body.get("Key") or body.get("key")
-    if not key:
-        result["warnings"] = ["create/update response had no Key; could not verify"]
-        return result
-    persisted = await get_client().get(f"{w.form_path}/{key}")
-    form = persisted if isinstance(persisted, dict) else None
-    result["warnings"] = diff_persisted(w, fields, form)
-    result["verified"] = persisted
-    return result
-
-
 def _make_create_tool(resource_name: str) -> Any:
     w = WRITABLE[resource_name]
     stem = w.tool_stem
 
     async def _create(fields: dict[str, Any]) -> dict[str, Any]:
-        validate_write_body(w, fields, creating=True)
-        payload = normalize_write_body(w, fields)
-        body = await get_client().post(w.form_path, json=payload)
-        if w.known_keys:
-            return await _persist_and_verify(resource_name, payload, body)
-        return {"resource": resource_name, "body": body}
+        return {"resource": resource_name, **await _tt._post(get_client(), w, fields)}
 
     _create.__name__ = f"create_{stem}"
     notes = f" {w.create_notes}" if w.create_notes else ""
@@ -348,13 +336,10 @@ def _make_update_tool(resource_name: str) -> Any:
     async def _update(key: str, fields: dict[str, Any]) -> dict[str, Any]:
         validate_write_body(w, fields, creating=False)
         payload = normalize_write_body(w, fields)
-        path = f"{w.form_path}/{key}"
-        body = await get_client().put(path, json=payload)
-        if w.known_keys:
-            out = await _persist_and_verify(resource_name, payload, body or {"Key": key})
-            out["key"] = key
-            return out
-        return {"resource": resource_name, "key": key, "body": body}
+        client = get_client()
+        body = await client.put(f"{w.form_path}/{key}", json=payload)
+        warnings = await _tt._verify(client, w, payload, body or {"Key": key})
+        return {"resource": resource_name, "key": key, "body": body, "warnings": warnings}
 
     _update.__name__ = f"update_{stem}"
     _update.__doc__ = (
@@ -397,14 +382,6 @@ _DELETE_ANNOTATIONS = {
 }
 
 
-def _deprecation_prefix(policy: WritePolicy, stem: str) -> str:
-    if "raw" in policy.write_scopes:
-        return ""
-    if stem in _CRUD_EXEMPT_FROM_DEPRECATION:
-        return ""
-    return "[DEPRECATED in 0.2.0; use task tools] "
-
-
 def _scopes_for_registration(policy: WritePolicy) -> set[str]:
     if "raw" in policy.write_scopes or "raw" in policy.delete_scopes:
         return set(DOMAIN_SCOPES)
@@ -417,32 +394,31 @@ def register_write_tools() -> None:
     if _write_tools_registered:
         return
     policy = get_policy()
-
-    def prefix_fn(stem: str) -> str:
-        return _deprecation_prefix(policy, stem)
+    raw = "raw" in policy.write_scopes or "raw" in policy.delete_scopes
 
     for scope in sorted(_scopes_for_registration(policy)):
         for w in implemented_for_scope(scope):
             stem = w.tool_stem
-            dep = prefix_fn(stem)
+            covered = w.name in _TASK_COVERED and not raw
             if w.scope in policy.effective_write_scopes:
-                create_fn = _make_create_tool(w.name)
+                if not covered:
+                    create_fn = _make_create_tool(w.name)
+                    mcp.tool(
+                        name=f"create_{stem}",
+                        description=create_fn.__doc__ or "",
+                        annotations=_WRITE_ANNOTATIONS,
+                    )(create_fn)
                 update_fn = _make_update_tool(w.name)
                 mcp.tool(
-                    name=f"create_{stem}",
-                    description=dep + (create_fn.__doc__ or ""),
-                    annotations=_WRITE_ANNOTATIONS,
-                )(create_fn)
-                mcp.tool(
                     name=f"update_{stem}",
-                    description=dep + (update_fn.__doc__ or ""),
+                    description=update_fn.__doc__ or "",
                     annotations=_WRITE_ANNOTATIONS,
                 )(update_fn)
-            if w.scope in policy.effective_delete_scopes:
+            if w.scope in policy.effective_delete_scopes and not covered:
                 delete_fn = _make_delete_tool(w.name)
                 mcp.tool(
                     name=f"delete_{stem}",
-                    description=dep + (delete_fn.__doc__ or ""),
+                    description=delete_fn.__doc__ or "",
                     annotations=_DELETE_ANNOTATIONS,
                 )(delete_fn)
     _write_tools_registered = True
@@ -579,7 +555,7 @@ def register_task_tools() -> None:
             amount: float,
             invoice_key: str,
             reference: str | None = None,
-            paid_by: int = 1,
+            paid_by: int = 2,
             description: str | None = None,
         ) -> dict[str, Any]:
             return await _tt.record_supplier_payment(
@@ -639,7 +615,8 @@ def register_task_tools() -> None:
             name="record_expense",
             description=(
                 "Record an expense via expense_claim (payroll) or purchase_invoice "
-                "(purchases). Requires payroll and/or purchases scope."
+                "(purchases). Requires payroll and/or purchases scope. "
+                "via: auto, expense_claim or purchase_invoice."
             ),
             annotations=_WRITE_ANNOTATIONS,
         )

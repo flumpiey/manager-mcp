@@ -21,7 +21,7 @@
 - **Task tools.** Intent-shaped writes such as `record_customer_payment` (receipt plus invoice allocation) instead of raw form posts.
 - **Hard denylist.** Access tokens, chart of accounts forms, tax codes, currencies, exchange rates, starting balances, bank reconciliation, custom field definitions, themes and email settings stay blocked even with writes on.
 - **Fail-loud configuration.** Unknown scopes, wildcards (`*`, `all`) and the legacy `MANAGER_MCP_ALLOW_WRITES` style variables stop the server at start-up.
-- **Customer deposit workflow.** Deposits post to a deposit bank or cash account, never to income. A missing account returns `precondition_failed` with setup steps.
+- **Customer deposit workflow.** Deposits post to a deposit bank or cash account, never to income. The server looks for an account named exactly "Customer deposits", or you pass `bank_account`. A missing account returns `precondition_failed` with setup steps.
 - **Packaged for hosts.** PyPI package for `uvx`, a Claude Desktop extension (`.mcpb`), a Cursor plugin and an entry in the MCP Registry as `io.github.flumpiey/manager-mcp`.
 - **Companion agent skill.** [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md) tells the model to call `list_resources` first and to verify after writes.
 
@@ -112,8 +112,6 @@ mcpServers:
 | `MANAGER_API_KEY` | yes | none | Access token, sent as the `X-API-KEY` header. |
 | `MANAGER_MCP_WRITE_SCOPES` | no | empty (read-only) | Comma-separated domains that get create and update tools. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | empty | Comma-separated domains that get delete tools and `void_document`. |
-| `MANAGER_API4_URL` | no | `MANAGER_API_URL` with `/api2` replaced by `/api4` | API4 base for the client's API4 helper. No current tool calls API4. |
-| `MANAGER_BUSINESS_NAME` | no | empty | `business` query value for API4 calls. No current tool calls API4. |
 | `TEST_MANAGER_API_URL` | integration tests only | none | Sandbox business URL for `pytest -m integration`. |
 | `TEST_MANAGER_API_KEY` | integration tests only | none | Sandbox business token for `pytest -m integration`. |
 
@@ -128,7 +126,7 @@ A narrow set covers most bookkeeping:
 
 ## Tools
 
-The server registers 10 tools with no scopes and 98 with every domain scope on.
+The server registers 10 tools with no scopes, 80 with every domain scope on, and 98 with `raw`.
 
 ### Read tools (always on)
 
@@ -165,9 +163,9 @@ The server registers 10 tools with no scopes and 98 with every domain scope on.
 | `create_customer`, `update_customer`, `create_supplier`, `update_supplier` | write | `parties` | Creates or updates a customer or supplier. |
 | `delete_customer`, `delete_supplier` | delete | `parties` (delete) | Deletes a customer or supplier. |
 
-### Deprecated CRUD tools
+### Per-resource CRUD tools
 
-Each enabled scope also registers `create_*` and `update_*` (write) and `delete_*` (delete) for its resources. Their descriptions carry `[DEPRECATED in 0.2.0; use task tools]`. Prefer the task tools.
+Each enabled scope also registers `create_*` and `update_*` (write) and `delete_*` (delete) for its resources. For documents that task tools cover, `create_*` and `delete_*` register only with the `raw` scope; use the task tools and `void_document`. These are sales and purchase invoices, quotes, receipts, payments, inter-account transfers, journal entries and expense claims. `update_*` registers for every resource.
 
 | Scope | Resources |
 | --- | --- |
@@ -187,7 +185,7 @@ Each enabled scope also registers `create_*` and `update_*` (write) and `delete_
 2. **Request gate.** The HTTP client checks every `POST`, `PUT`, `PATCH` and `DELETE` against the scope map again before it sends the request. An unmapped path is refused.
 3. **Denylist.** Paths for access tokens, chart of accounts and other `*-account-form` paths (except bank or cash accounts), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields, themes and email templates or settings are refused for every scope, `raw` included.
 4. **Automation gate.** Custom button paths need `automation` in the matching scope, because a button can call external systems.
-5. **`raw` escape hatch.** `raw` expands to every domain scope. Use it only when you need the full CRUD set.
+5. **`raw` escape hatch.** `raw` expands to every domain scope and restores `create_*` and `delete_*` for task-covered documents. Use it only when you need the full CRUD set.
 
 A deposit is not revenue. Confirm tax and VAT treatment of deposits with your accountant.
 

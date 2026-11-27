@@ -4,13 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from manager_mcp.client import ManagerClient
-from manager_mcp.preconditions import (
-    _DEPOSIT_ACCOUNT_GUIDE,
-    PreconditionItem,
-    PreconditionResult,
-    precondition_failed_response,
-)
+import httpx
+
+from manager_mcp.client import ManagerApiError, ManagerClient, ManagerUnavailableError
 from manager_mcp.scopes import WritePolicy, WritesDeniedError
 from manager_mcp.writable import WRITABLE, WritableResource
 from manager_mcp.write_validate import diff_persisted, normalize_write_body, validate_write_body
@@ -62,32 +58,37 @@ async def _post(
     validate_write_body(resource, fields, creating=True)
     payload = normalize_write_body(resource, fields)
     body = await client.post(resource.form_path, json=payload)
-    warnings: list[str] = []
-    if resource.known_keys and isinstance(body, dict):
-        key = body.get("Key") or body.get("key")
-        if key:
-            persisted = await client.get(f"{resource.form_path}/{key}")
-            form = persisted if isinstance(persisted, dict) else None
-            warnings = diff_persisted(resource, payload, form)
-    return {"body": body, "warnings": warnings}
+    return {"body": body, "warnings": await _verify(client, resource, payload, body)}
+
+
+async def _verify(
+    client: ManagerClient, resource: WritableResource, payload: dict[str, Any], body: Any
+) -> list[str]:
+    """Read the saved form back and diff it. Never raises: the write already happened."""
+    if not isinstance(body, dict):
+        return []
+    key = body.get("Key") or body.get("key")
+    if not key:
+        return ["create/update response had no Key; could not verify"]
+    try:
+        persisted = await client.get(f"{resource.form_path}/{key}")
+    except (ManagerUnavailableError, ManagerApiError, httpx.HTTPStatusError) as exc:
+        return [f"Saved as {key} but read-back failed; do not retry the write. Detail: {exc}"]
+    form = persisted if isinstance(persisted, dict) else None
+    if resource.known_keys:
+        return diff_persisted(resource, payload, form)
+    if form is None:
+        return ["could not verify persistence (no form body returned)"]
+    # Manager returns 201 but drops unknown field names; empty values are omitted on read.
+    return [
+        f"{k} missing after save (Manager drops unknown field names; clone get_record)"
+        for k, v in payload.items()
+        if v and k not in form
+    ]
 
 
 async def _accounts_payable_account_key(client: ManagerClient) -> str | None:
-    """Resolve the control Accounts payable account from an existing payment or COA."""
-    payments = await client.get("/payments", params={"skip": 0, "pageSize": 10})
-    if isinstance(payments, dict):
-        for row in payments.get("payments") or []:
-            if not isinstance(row, dict):
-                continue
-            pay_key = row.get("Key") or row.get("key")
-            if not pay_key:
-                continue
-            form = await client.get(f"/payment-form/{pay_key}")
-            if not isinstance(form, dict):
-                continue
-            for line in form.get("Lines") or []:
-                if isinstance(line, dict) and line.get("Account"):
-                    return str(line["Account"])
+    """Resolve the Accounts payable control account from the COA, else a past AP line."""
     coa = await client.get("/chart-of-accounts", params={"skip": 0, "pageSize": 200})
     if isinstance(coa, dict):
         for item in coa.get("chartOfAccounts") or []:
@@ -99,35 +100,59 @@ async def _accounts_payable_account_key(client: ManagerClient) -> str | None:
                 key = item.get("Key") or item.get("key")
                 if key:
                     return str(key)
+    payments = await client.get("/payments", params={"skip": 0, "pageSize": 10})
+    if isinstance(payments, dict):
+        for row in payments.get("payments") or []:
+            pay_key = (row.get("Key") or row.get("key")) if isinstance(row, dict) else None
+            if not pay_key:
+                continue
+            form = await client.get(f"/payment-form/{pay_key}")
+            for line in (form.get("Lines") or []) if isinstance(form, dict) else []:
+                # Only supplier lines post to AP; other lines (bank fees) hit expense accounts.
+                if (
+                    isinstance(line, dict)
+                    and line.get("Account")
+                    and line.get("AccountsPayableSupplier")
+                ):
+                    return str(line["Account"])
     return None
 
 
 def _allocation_link_warning(warnings: list[str], link_field: str) -> str | None:
     needle = f".{link_field} "
     for warning in warnings:
-        if link_field in warning and ("missing after save" in warning or "differs after save" in warning):
+        if link_field in warning and (
+            "missing after save" in warning or "differs after save" in warning
+        ):
             return warning
         if needle in warning:
             return warning
     return None
 
 
+_DEPOSIT_ACCOUNT_NAME = "customer deposits"
+_DEPOSIT_ACCOUNT_GUIDE = (
+    "In Manager: Settings → Bank and Cash Accounts → New Account. "
+    "Name it exactly 'Customer deposits' (liability-style holding account), "
+    "or pass bank_account explicitly. Alternatively, with banking scope enabled, "
+    "call create_bank_account with {\"Name\": \"Customer deposits\"} in a separate step."
+)
+
+
 async def _find_deposit_bank_account(client: ManagerClient) -> dict[str, Any] | None:
+    # Exact name only: a substring match picked real accounts such as "Fixed Deposit".
     body = await client.get(
         "/bank-and-cash-accounts",
-        params={"skip": 0, "pageSize": 50},
+        params={"term": _DEPOSIT_ACCOUNT_NAME, "skip": 0, "pageSize": 50},
     )
     if not isinstance(body, dict):
         return None
-    items = body.get("bankAndCashAccounts") or []
-    for item in items:
+    for item in body.get("bankAndCashAccounts") or []:
         if not isinstance(item, dict):
             continue
         key = item.get("Key") or item.get("key")
-        if not key:
-            continue
-        name = str(item.get("Name") or item.get("name") or item.get("text") or "").casefold()
-        if "deposit" in name:
+        name = str(item.get("Name") or item.get("name") or item.get("text") or "")
+        if key and name.strip().casefold() == _DEPOSIT_ACCOUNT_NAME:
             return {**item, "Key": key}
     return None
 
@@ -263,18 +288,7 @@ async def record_customer_payment(
         paid_by=paid_by,
         description=description,
     )
-    try:
-        out = await _post(client, WRITABLE["receipts"], fields)
-    except Exception as exc:
-        return _envelope(
-            "partial",
-            keys={},
-            warnings=[str(exc)],
-            next_steps=[
-                "Fix the receipt body (clone get_record template) and call "
-                "record_customer_payment again with the same allocation."
-            ],
-        )
+    out = await _post(client, WRITABLE["receipts"], fields)
     key = _body_key(out["body"])
     if not invoice_key:
         return _envelope(
@@ -350,15 +364,7 @@ async def record_supplier_payment(
         fields["Reference"] = reference
     if description:
         fields["Description"] = description
-    try:
-        out = await _post(client, WRITABLE["payments"], fields)
-    except Exception as exc:
-        return _envelope(
-            "partial",
-            keys={},
-            warnings=[str(exc)],
-            next_steps=["Fix payment body and retry record_supplier_payment."],
-        )
+    out = await _post(client, WRITABLE["payments"], fields)
     payment_key = _body_key(out["body"])
     link_warning = _allocation_link_warning(out["warnings"], "PurchaseInvoice")
     if link_warning:
@@ -388,22 +394,16 @@ async def record_expense(
     *,
     via: str = "auto",
 ) -> dict[str, Any]:
-    effective = policy.effective_write_scopes
-    use_payroll = via == "expense_claim" or (
-        via == "auto" and "payroll" in effective and "purchases" not in effective
-    )
-    if use_payroll and "payroll" in effective:
+    if via not in {"auto", "expense_claim", "purchase_invoice"}:
+        raise ValueError(f"via must be auto, expense_claim or purchase_invoice, not {via!r}.")
+    if via == "expense_claim" or (
+        via == "auto" and "purchases" not in policy.effective_write_scopes
+    ):
         require_write_scopes(policy, "payroll")
-        resource = WRITABLE["expense_claims"]
-        label = "expense_claim"
-    elif "purchases" in effective:
-        require_write_scopes(policy, "purchases")
-        resource = WRITABLE["purchase_invoices"]
-        label = "purchase_invoice"
+        resource, label = WRITABLE["expense_claims"], "expense_claim"
     else:
-        raise WritesDeniedError(
-            "record_expense requires payroll and/or purchases in WRITE_SCOPES."
-        )
+        require_write_scopes(policy, "purchases")
+        resource, label = WRITABLE["purchase_invoices"], "purchase_invoice"
     out = await _post(client, resource, fields)
     return _envelope(
         "ok", keys={label: _body_key(out["body"])}, body=out["body"], warnings=out["warnings"]
@@ -476,20 +476,25 @@ async def record_customer_deposit(
         if found:
             deposit_account = str(found["Key"])
     if not deposit_account:
-        result = PreconditionResult(
-            ok=False,
-            missing=(
-                PreconditionItem(
-                    name="deposit_bank_account",
-                    why=(
-                        "Customer deposits must post to a dedicated bank/cash holding "
-                        "account so they are not booked as revenue."
-                    ),
-                    how_to_create=_DEPOSIT_ACCOUNT_GUIDE,
-                ),
-            ),
-        )
-        return precondition_failed_response(result)
+        return {
+            "status": "precondition_failed",
+            "preconditions": {
+                "ok": False,
+                "missing": [
+                    {
+                        "name": "deposit_bank_account",
+                        "why": (
+                            "Customer deposits must post to a dedicated bank/cash holding "
+                            "account so they are not booked as revenue."
+                        ),
+                        "how_to_create": _DEPOSIT_ACCOUNT_GUIDE,
+                    }
+                ],
+            },
+            "keys": {},
+            "warnings": [],
+            "next_steps": [_DEPOSIT_ACCOUNT_GUIDE],
+        }
     fields = _receipt_with_allocation(
         customer=customer,
         bank_account=deposit_account,

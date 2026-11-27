@@ -121,14 +121,8 @@ def test_quotes_tool_names_registered(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(mcp, "tool", fake_tool)
     register_write_tools()
-    assert set(captured) == {
-        "create_sales_quote",
-        "update_sales_quote",
-        "delete_sales_quote",
-        "create_purchase_quote",
-        "update_purchase_quote",
-        "delete_purchase_quote",
-    }
+    # Quotes are task-covered: issue_quote creates, void_document deletes.
+    assert set(captured) == {"update_sales_quote", "update_purchase_quote"}
 
 
 def test_write_only_registers_create_update(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,10 +142,5 @@ def test_write_only_registers_create_update(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(mcp, "tool", fake_tool)
     register_write_tools()
-    assert set(captured) == {
-        "create_sales_quote",
-        "update_sales_quote",
-        "create_purchase_quote",
-        "update_purchase_quote",
-    }
+    assert set(captured) == {"update_sales_quote", "update_purchase_quote"}
     assert not any(n.startswith("delete_") for n in captured)
