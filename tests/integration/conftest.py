@@ -19,9 +19,7 @@ from manager_mcp.writable import WRITABLE
 from manager_mcp.write_validate import validate_write_body
 
 _ROOT = Path(__file__).resolve().parents[2]
-_ALL_SCOPES = (
-    "quotes,orders,parties,items,sales,purchases,banking,payroll,ledger"
-)
+_ALL_SCOPES = "quotes,orders,parties,items,sales,purchases,banking,payroll,ledger,automation"
 _BANK_CACHE: dict[str, str] = {}
 _INCOME_ACCOUNT_CACHE: str | None = None
 

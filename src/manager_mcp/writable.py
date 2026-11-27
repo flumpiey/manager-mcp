@@ -70,7 +70,7 @@ _QUOTE_PURCHASE_NOTES = (
 _BANKING_WORKFLOW = (
     "MCP rejects empty bodies and unknown field names before POST. "
     "Workflow: list_resources → get_record template → create_* → verify warnings. "
-    "Clone Lines from the template. PaidBy must be int. "
+    "Clone Lines from the template. Payee/Payer (or legacy PaidBy) must be int. "
     "FX: Amount on AR lines is base currency; Manager clears USD AR using the "
     "invoice rate, not receipt ExchangeRate alone — set AR Amount in invoice-rate "
     "ZAR (or add an explicit FX line) so bank net matches."
@@ -90,6 +90,7 @@ _RECEIPT_KNOWN = frozenset(
         "Key",
         "Lines",
         "PaidBy",
+        "Payer",
         "ProjectEnabled",
         "ReceivedIn",
         "Reference",
@@ -104,6 +105,7 @@ _RECEIPT_LINE_KNOWN = frozenset(
         "Account",
         "AccountsReceivableCustomer",
         "AccountsReceivableSalesInvoice",
+        "SalesInvoice",
         "Amount",
         "Description",
         "LineDescription",
@@ -124,6 +126,7 @@ _PAYMENT_KNOWN = frozenset(
         "Key",
         "Lines",
         "PaidBy",
+        "Payee",
         "PaidFrom",
         "ProjectEnabled",
         "Reference",
@@ -139,6 +142,7 @@ _PAYMENT_LINE_KNOWN = frozenset(
         "Account",
         "AccountsPayableSupplier",
         "AccountsPayablePurchaseInvoice",
+        "PurchaseInvoice",
         "Amount",
         "Description",
         "LineDescription",
@@ -149,14 +153,80 @@ _PAYMENT_REQUIRED = frozenset({"PaidFrom", "Date", "Lines"})
 _RECEIPT_NOTES = (
     "Known header keys include ReceivedIn, Customer, Date, PaidBy (int), "
     "ExchangeRate, Description, Reference, Lines. Line keys include Amount, "
-    "AccountsReceivableCustomer, AccountsReceivableSalesInvoice, Account. "
-    + _BANKING_WORKFLOW
+    "AccountsReceivableCustomer, AccountsReceivableSalesInvoice (legacy alias "
+    "SalesInvoice maps before POST), Account. " + _BANKING_WORKFLOW
 )
 
 _PAYMENT_NOTES = (
-    "Known header keys include PaidFrom, Supplier, Date, PaidBy (int), "
-    "ExchangeRate, Description, Reference, Lines. "
-    + _BANKING_WORKFLOW
+    "Known header keys include PaidFrom, Supplier, Date, Payee (int; legacy PaidBy "
+    "maps to Payee), ExchangeRate, Description, Reference, Lines. Line keys include "
+    "Amount, AccountsPayableSupplier, PurchaseInvoice, Account. " + _BANKING_WORKFLOW
+)
+
+_JOURNAL_KNOWN = frozenset(
+    {
+        "AmountsAreTaxExclusive",
+        "CustomFields",
+        "CustomFields2",
+        "CustomThemeId",
+        "Date",
+        "Description",
+        "ExchangeRate",
+        "HasLineNumber",
+        "Key",
+        "Lines",
+        "Narration",
+        "ProjectEnabled",
+        "Reference",
+        "TaxCodeEnabled",
+        "UniqueName",
+        "id",
+        "text",
+    }
+)
+_JOURNAL_LINE_KNOWN = frozenset(
+    {
+        "Account",
+        "Amount",
+        "Credit",
+        "Debit",
+        "Description",
+        "Division",
+        "LineDescription",
+        "TaxCode",
+    }
+)
+_JOURNAL_REQUIRED = frozenset({"Date", "Lines"})
+
+_CUSTOM_BUTTON_KNOWN = frozenset(
+    {
+        "CustomFields",
+        "CustomFields2",
+        "Description",
+        "Endpoint",
+        "Html",
+        "Inactive",
+        "Key",
+        "Name",
+        "Placement",
+        "ProjectEnabled",
+        "Source",
+        "TaxCodeEnabled",
+        "Text",
+        "UniqueName",
+        "endpoint",
+        "html",
+        "id",
+        "inactive",
+        "source",
+        "text",
+    }
+)
+_CUSTOM_BUTTON_NOTES = (
+    "Custom buttons can call external endpoints or run HTML/JS in Manager. "
+    "Requires automation scope. Clone get_record before create. "
+    "Use Endpoint/html (lowercase aliases normalise before POST). "
+    "There is no API2 invoke endpoint; users click buttons in Manager."
 )
 
 # Paths confirmed via live OpenAPI (Malva dev, 2026-07-28).
@@ -411,7 +481,11 @@ WRITABLE: dict[str, WritableResource] = {
         "journalEntries",
         tool_stem="journal_entry",
         implemented=True,
-        create_notes=_DEFAULT_NOTES + " Prefer TEST books; ledger mutations are high impact.",
+        create_notes=_DEFAULT_NOTES + " Prefer TEST books; ledger mutations are high impact. "
+        "Unknown field names are rejected before POST.",
+        known_keys=_JOURNAL_KNOWN,
+        known_line_keys=_JOURNAL_LINE_KNOWN,
+        required_keys=_JOURNAL_REQUIRED,
     ),
     "depreciation_entries": _w(
         "depreciation_entries",
@@ -432,6 +506,18 @@ WRITABLE: dict[str, WritableResource] = {
         tool_stem="amortization_entry",
         implemented=True,
         create_notes=_DEFAULT_NOTES,
+    ),
+    "custom_buttons": _w(
+        "custom_buttons",
+        "automation",
+        "/custom-button-form",
+        "/custom-buttons",
+        "customButtons",
+        tool_stem="custom_button",
+        implemented=True,
+        create_notes=_CUSTOM_BUTTON_NOTES,
+        known_keys=_CUSTOM_BUTTON_KNOWN,
+        required_keys=frozenset(),
     ),
 }
 

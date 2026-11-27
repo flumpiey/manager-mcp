@@ -1,0 +1,43 @@
+﻿{
+  "api2_base": "http://127.0.0.1:55339/api2",
+  "api4_base": "http://127.0.0.1:55339/api4",
+  "api2_openapi_custom_button_paths": [
+    "/custom-button-form",
+    "/custom-button-form/{key}",
+    "/custom-buttons"
+  ],
+  "api4_openapi_custom_button_paths": [],
+  "api2_list_probe": {
+    "/custom-buttons": {
+      "status": 200,
+      "envelope_keys": [
+        "business",
+        "skip",
+        "pageSize",
+        "totalRecords",
+        "customButtons"
+      ]
+    },
+    "/custom-button": {
+      "status": 404,
+      "envelope_keys": null
+    }
+  },
+  "api2_form_probe": {},
+  "api4_custom_button_probe": {
+    "GET_/custom-button": {
+      "status": 400,
+      "body_keys": ""
+    },
+    "POST_/custom-button": {
+      "status": 400,
+      "body": {
+        "error": "bad_request",
+        "message": "Business name is required. Provide it as a 'business' query parameter (e.g. ?business=Acme%20Pty%20Ltd) or via the 'Manager-Business' request header."
+      }
+    }
+  },
+  "invoke_candidates": [],
+  "api2_root_status": 200,
+  "api4_root_status": 200
+}

@@ -53,3 +53,17 @@ def test_bank_or_cash_allowed_when_banking_or_raw(scopes: frozenset[str]) -> Non
     else:
         with pytest.raises(WritesDeniedError):
             policy.authorize("POST", "/bank-or-cash-account-form")
+
+
+def test_custom_button_form_not_globally_denylisted() -> None:
+    assert not is_denylisted("/custom-button-form")
+
+
+@pytest.mark.parametrize("scopes", _SCOPE_COMBOS)
+def test_custom_button_form_requires_automation_scope(scopes: frozenset[str]) -> None:
+    policy = WritePolicy(write_scopes=scopes, delete_scopes=scopes)
+    if "automation" in policy.effective_write_scopes:
+        policy.authorize("POST", "/custom-button-form")
+    else:
+        with pytest.raises(WritesDeniedError, match="automation"):
+            policy.authorize("POST", "/custom-button-form")

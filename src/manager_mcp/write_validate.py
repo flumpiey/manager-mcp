@@ -2,9 +2,77 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from manager_mcp.writable import WritableResource
+
+_INT_PARTY_KEYS = frozenset({"PaidBy", "Payee", "Payer"})
+
+_RECEIPT_LINE_ALIASES = {
+    "SalesInvoice": "AccountsReceivableSalesInvoice",
+}
+_PAYMENT_LINE_ALIASES = {
+    "AccountsPayablePurchaseInvoice": "PurchaseInvoice",
+}
+_CUSTOM_BUTTON_HEADER_ALIASES = {
+    "endpoint": "Endpoint",
+    "html": "Html",
+    "inactive": "Inactive",
+}
+
+
+def _validate_int_party_keys(resource: WritableResource, fields: dict[str, Any]) -> None:
+    for key in _INT_PARTY_KEYS:
+        if key not in fields or fields[key] is None:
+            continue
+        value = fields[key]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"{resource.name}: {key} must be int (e.g. 1), not {type(value).__name__}."
+            )
+
+
+def normalize_write_body(
+    resource: WritableResource,
+    fields: dict[str, Any],
+) -> dict[str, Any]:
+    """Map legacy MCP field names to Manager-native names before POST/PUT."""
+    if not resource.known_keys:
+        return fields
+    out = copy.deepcopy(fields)
+    if resource.name == "receipts":
+        line_aliases = _RECEIPT_LINE_ALIASES
+    elif resource.name == "payments":
+        if "PaidBy" in out and "Payee" not in out:
+            out["Payee"] = out.pop("PaidBy")
+        elif "PaidBy" in out:
+            out.pop("PaidBy", None)
+        line_aliases = _PAYMENT_LINE_ALIASES
+    elif resource.name == "custom_buttons":
+        for old, new in _CUSTOM_BUTTON_HEADER_ALIASES.items():
+            if old in out and new not in out:
+                out[new] = out.pop(old)
+            elif old in out:
+                out.pop(old, None)
+        if "Text" in out:
+            if "Name" not in out and out["Text"]:
+                out["Name"] = out["Text"]
+            out.pop("Text", None)
+        line_aliases = {}
+    else:
+        line_aliases = {}
+    lines = out.get("Lines")
+    if isinstance(lines, list) and line_aliases:
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            for old, new in line_aliases.items():
+                if old in line and new not in line:
+                    line[new] = line.pop(old)
+                elif old in line:
+                    line.pop(old, None)
+    return out
 
 
 def validate_write_body(
@@ -36,13 +104,7 @@ def validate_write_body(
                 f"{resource.name}: missing required field(s) {missing}. "
                 "Clone get_record template before create."
             )
-    if "PaidBy" in fields and fields["PaidBy"] is not None:
-        paid = fields["PaidBy"]
-        if isinstance(paid, bool) or not isinstance(paid, int):
-            raise ValueError(
-                f"{resource.name}: PaidBy must be int (e.g. 1), not "
-                f"{type(paid).__name__}."
-            )
+    _validate_int_party_keys(resource, fields)
     lines = fields.get("Lines")
     if lines is None:
         return
@@ -66,6 +128,21 @@ def validate_write_body(
             )
 
 
+def _values_equal(submitted: Any, persisted: Any) -> bool:
+    if submitted == persisted:
+        return True
+    if isinstance(submitted, str) and isinstance(persisted, str):
+        if (
+            len(submitted) >= 10
+            and submitted[:10] == persisted[:10]
+            and submitted[:10].count("-") == 2
+        ):
+            return True
+    if isinstance(submitted, (int, float)) and isinstance(persisted, (int, float)):
+        return float(submitted) == float(persisted)
+    return False
+
+
 def diff_persisted(
     resource: WritableResource,
     submitted: dict[str, Any],
@@ -82,19 +159,39 @@ def diff_persisted(
         if key not in persisted:
             warnings.append(f"{key} missing after save (submitted value may have been dropped)")
             continue
-        tracked = {"ReceivedIn", "PaidFrom", "Customer", "Supplier"}
-        if key in tracked and persisted.get(key) != value:
+        if not _values_equal(value, persisted.get(key)):
             warnings.append(
-                f"{key} differs after save "
-                f"(submitted={value!r}, got={persisted.get(key)!r})"
+                f"{key} differs after save (submitted={value!r}, got={persisted.get(key)!r})"
             )
-    if "Lines" in submitted and isinstance(submitted["Lines"], list):
-        got = persisted.get("Lines")
-        if not isinstance(got, list):
-            warnings.append("Lines missing after save")
-        elif len(got) != len(submitted["Lines"]):
-            warnings.append(
-                f"Lines count differs after save (submitted={len(submitted['Lines'])}, "
-                f"got={len(got)})"
-            )
+    if "Lines" not in submitted or not isinstance(submitted["Lines"], list):
+        return warnings
+    got = persisted.get("Lines")
+    if not isinstance(got, list):
+        warnings.append("Lines missing after save")
+        return warnings
+    submitted_lines = submitted["Lines"]
+    if len(got) != len(submitted_lines):
+        warnings.append(
+            f"Lines count differs after save (submitted={len(submitted_lines)}, got={len(got)})"
+        )
+    if not resource.known_line_keys:
+        return warnings
+    for index, line in enumerate(submitted_lines):
+        if not isinstance(line, dict):
+            continue
+        got_line = got[index] if index < len(got) and isinstance(got[index], dict) else {}
+        for field, value in line.items():
+            if field not in resource.known_line_keys:
+                continue
+            if field not in got_line:
+                warnings.append(
+                    f"Lines[{index}].{field} missing after save "
+                    f"(submitted value may have been dropped)"
+                )
+                continue
+            if not _values_equal(value, got_line.get(field)):
+                warnings.append(
+                    f"Lines[{index}].{field} differs after save "
+                    f"(submitted={value!r}, got={got_line.get(field)!r})"
+                )
     return warnings

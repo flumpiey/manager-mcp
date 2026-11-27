@@ -33,6 +33,7 @@ WRITABLE_COLLECTIONS = {
     "journal_entries",
     "depreciation_entries",
     "amortization_entries",
+    "custom_buttons",
 }
 COLLECTIONS = CORE_COLLECTIONS | WRITABLE_COLLECTIONS
 REPORTS = {

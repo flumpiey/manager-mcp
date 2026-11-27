@@ -25,7 +25,12 @@ Pairs with the **manager-mcp** MCP server.
   `MANAGER_MCP_DELETE_SCOPES` (delete). Delete is never implied by write.
 - Recommended write scopes: `banking,sales,parties` (not all nine domains).
 - Never attempt access-token, chart-of-accounts / control-account forms,
-  tax/currency minting, starting balances, or other denylisted paths.
+  tax/currency minting, starting balances, custom **field** definitions, or
+  other denylisted paths.
+- Custom **buttons**: read via `list_records` / `get_record` on `custom_buttons`.
+  Create/update/delete only with `automation` in write/delete scopes
+  (`create_custom_button`, …). There is no API2 invoke tool; clicking runs in
+  Manager or the button's external `Endpoint`.
 - `raw` in WRITE_SCOPES restores the full CRUD set (advanced escape hatch).
 
 ## Config
@@ -48,7 +53,7 @@ When a tool returns `status: precondition_failed`:
 Registered when required scopes are in `effective_write_scopes`:
 
 | Tool | Scopes | Bookkeeper sentence |
-|------|--------|---------------------|
+| ------ | -------- | --------------------- |
 | `issue_sales_invoice` | sales | Issue a sales invoice |
 | `issue_purchase_invoice` | purchases | Issue a purchase invoice |
 | `issue_quote` | quotes | Issue a quote |
@@ -64,6 +69,9 @@ Registered when required scopes are in `effective_write_scopes`:
 | `apply_deposit_to_invoice` | ledger | Apply held deposit to an invoice |
 
 `create_customer` and `create_supplier` remain as single-resource CRUD tools (parties scope).
+
+With `automation` scope: `create_custom_button`, `update_custom_button`,
+`delete_custom_button` (no `invoke_custom_button`; see research-writes-automation.md).
 
 Per-resource CRUD is **deprecated in 0.2.0** (removed in 0.3.0). Use task tools unless `raw` scope is set.
 

@@ -15,7 +15,7 @@ from manager_mcp.client import ManagerClient
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
 from manager_mcp.writable import WRITABLE, implemented_for_scope
-from manager_mcp.write_validate import diff_persisted, validate_write_body
+from manager_mcp.write_validate import diff_persisted, normalize_write_body, validate_write_body
 
 _PERIOD_ALIASES = {
     "from_date": "fromDate",
@@ -326,9 +326,10 @@ def _make_create_tool(resource_name: str) -> Any:
 
     async def _create(fields: dict[str, Any]) -> dict[str, Any]:
         validate_write_body(w, fields, creating=True)
-        body = await get_client().post(w.form_path, json=fields)
+        payload = normalize_write_body(w, fields)
+        body = await get_client().post(w.form_path, json=payload)
         if w.known_keys:
-            return await _persist_and_verify(resource_name, fields, body)
+            return await _persist_and_verify(resource_name, payload, body)
         return {"resource": resource_name, "body": body}
 
     _create.__name__ = f"create_{stem}"
@@ -346,10 +347,11 @@ def _make_update_tool(resource_name: str) -> Any:
 
     async def _update(key: str, fields: dict[str, Any]) -> dict[str, Any]:
         validate_write_body(w, fields, creating=False)
+        payload = normalize_write_body(w, fields)
         path = f"{w.form_path}/{key}"
-        body = await get_client().put(path, json=fields)
+        body = await get_client().put(path, json=payload)
         if w.known_keys:
-            out = await _persist_and_verify(resource_name, fields, body or {"Key": key})
+            out = await _persist_and_verify(resource_name, payload, body or {"Key": key})
             out["key"] = key
             return out
         return {"resource": resource_name, "key": key, "body": body}

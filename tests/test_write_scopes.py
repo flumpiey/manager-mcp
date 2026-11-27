@@ -23,6 +23,7 @@ from manager_mcp.writable import WRITABLE, implemented_for_scope
         ("banking", "/receipt-form"),
         ("payroll", "/employee-form"),
         ("ledger", "/journal-entry-form"),
+        ("automation", "/custom-button-form"),
     ],
 )
 @pytest.mark.asyncio
@@ -63,6 +64,7 @@ def test_all_scopes_have_implemented_resources() -> None:
         "banking",
         "payroll",
         "ledger",
+        "automation",
     }
     found = {w.scope for w in WRITABLE.values() if w.implemented}
     assert found == expected

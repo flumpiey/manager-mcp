@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
-from manager_mcp.scopes import WRITE_METHODS, WritePolicy
+from manager_mcp.scopes import WRITE_METHODS, WRITE_SCOPES_ENV, WritePolicy, WritesDeniedError
 
-BASE_QUERY_KEYS = frozenset(
-    {"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"}
-)
+BASE_QUERY_KEYS = frozenset({"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"})
 
 
 class ConfigError(ValueError):
@@ -44,6 +43,7 @@ class ManagerClient:
             raise ConfigError("MANAGER_API_KEY is required")
         self.base_url = base_url.rstrip("/")
         self._api_key = api_key.strip()
+        self._api4_base_url = self._derive_api4_base(self.base_url)
         self._extra_query_keys = extra_query_keys or frozenset()
         self.policy = policy or WritePolicy(frozenset(), frozenset())
         self._owns_client = client is None
@@ -52,6 +52,56 @@ class ManagerClient:
             headers={"X-API-KEY": self._api_key},
             timeout=60.0,
         )
+
+    @staticmethod
+    def _derive_api4_base(api2_base: str) -> str:
+        explicit = os.environ.get("MANAGER_API4_URL", "").strip()
+        if explicit:
+            return explicit.rstrip("/")
+        parsed = urlparse(api2_base)
+        path = parsed.path.rstrip("/")
+        if path.casefold().endswith("/api2"):
+            path = path[: -len("/api2")] + "/api4"
+        else:
+            path = f"{path}/api4"
+        return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+    @property
+    def api4_base_url(self) -> str:
+        return self._api4_base_url
+
+    async def post_api4(
+        self,
+        path: str,
+        *,
+        json: Any = None,
+        business: str | None = None,
+    ) -> Any:
+        """POST to API4 (optional; custom buttons use API2 form CRUD in v1)."""
+        if "automation" not in self.policy.effective_write_scopes:
+            raise WritesDeniedError(
+                f"POST API4 {path} requires scope 'automation' in {WRITE_SCOPES_ENV}."
+            )
+        url_path = path if path.startswith("/") else f"/{path}"
+        params: dict[str, Any] = {}
+        business_name = business or os.environ.get("MANAGER_BUSINESS_NAME", "").strip()
+        if business_name:
+            params["business"] = business_name
+        try:
+            response = await self._client.request(
+                "POST",
+                f"{self._api4_base_url}{url_path}",
+                params=params or None,
+                json=json,
+            )
+        except httpx.RequestError as exc:
+            raise ManagerUnavailableError(
+                f"Manager.io API4 is not reachable at {self._api4_base_url}. Detail: {exc}"
+            ) from exc
+        response.raise_for_status()
+        if not response.content:
+            return None
+        return response.json()
 
     @classmethod
     def from_env(

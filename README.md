@@ -362,7 +362,7 @@ mcpServers:
 Any host that can spawn a stdio MCP server:
 
 | Field | Value |
-|-------|-------|
+| ------- | ------- |
 | Command | `uvx` |
 | Args | `manager-mcp` |
 | Env | `MANAGER_API_URL`, `MANAGER_API_KEY` (+ optional write scopes) |
@@ -380,13 +380,13 @@ Dev from a clone: `uv run --directory /path/to/manager-mcp manager-mcp`.
 ## Environment
 
 | Variable | Required | Notes |
-|----------|----------|-------|
+| ---------- | ---------- | ------- |
 | `MANAGER_API_URL` | yes | Opaque base URL (include `/api2` when needed) |
 | `MANAGER_API_KEY` | yes | Sent as `X-API-KEY`; never logged |
 | `MANAGER_MCP_WRITE_SCOPES` | no | Comma-separated domains for create/update. Empty = no writes. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | Comma-separated domains for delete only. Never implied by WRITE_SCOPES. |
 
-Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`, `raw`. No wildcards (`*`, `all`).
+Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`, `automation`, `raw`. No wildcards (`*`, `all`).
 
 **Recommended** (covers most bookkeeping without 82 tools):
 
@@ -408,7 +408,7 @@ When a scope is listed in `MANAGER_MCP_WRITE_SCOPES`, the server registers **tas
 ### Task tools (preferred)
 
 | Tool | Scopes | Purpose |
-|------|--------|---------|
+| ------ | -------- | --------- |
 | `create_customer`, `create_supplier` | parties | Single-resource party setup |
 | `issue_sales_invoice` | sales | Issue invoice with inline lines |
 | `issue_purchase_invoice` | purchases | Issue purchase invoice |
@@ -431,7 +431,7 @@ Bodies for composite tools use Manager-native JSON where noted. Clone `get_recor
 Per-resource `create_*` / `update_*` / `delete_*` still register when their domain scope is enabled. Descriptions are prefixed `[DEPRECATED in 0.2.0; use task tools]` except `create_customer` / `create_supplier`. Set `raw` in `MANAGER_MCP_WRITE_SCOPES` to register CRUD without deprecation prefixes.
 
 | Scope | Resources (CRUD when enabled) |
-|-------|-------------------------------|
+| ------- | ------------------------------- |
 | `quotes` | sales_quotes, purchase_quotes |
 | `orders` | sales_orders, purchase_orders |
 | `parties` | customers, suppliers |
@@ -441,6 +441,7 @@ Per-resource `create_*` / `update_*` / `delete_*` still register when their doma
 | `banking` | receipts, payments, inter_account_transfers, bank_accounts |
 | `payroll` | employees, payslips, expense_claims |
 | `ledger` | journal_entries, depreciation_entries, amortization_entries |
+| `automation` | custom_buttons (`create_custom_button`, …; no server-side invoke API) |
 
 Example with recommended scopes only:
 
@@ -449,7 +450,9 @@ Example with recommended scopes only:
 "MANAGER_MCP_DELETE_SCOPES": "sales"
 ```
 
-**Denylist (always blocked):** access-token forms, chart-of-accounts / `*-account-form` (except bank-or-cash), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields/buttons, themes, email templates/settings.
+**Denylist (always blocked):** access-token forms, chart-of-accounts / `*-account-form` (except bank-or-cash), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, **custom field definitions**, themes, email templates/settings.
+
+**Scope-gated (not denylisted globally):** custom buttons require `automation` in write/delete scopes; endpoints/HTML may call external systems.
 
 ## Customer deposit workflow
 
@@ -474,7 +477,7 @@ Required scopes: `banking`, `quotes` (deposit doc), `ledger` (apply), `sales` (f
 ### Read tools
 
 | Tool | Purpose | Period (`from_date` / `to_date`) |
-|------|---------|----------------------------------|
+| ------ | --------- | ---------------------------------- |
 | `list_resources` | Discovery; reports `read_only` + live write/delete scopes | n/a |
 | `list_records` | Search/page a curated collection | n/a |
 | `get_record` | Fetch one record via `{path}-form/{key}` | n/a |
@@ -497,7 +500,7 @@ Collections for `list_records` / `get_record`: `customers`, `suppliers`, `sales_
 Registered only for resources in enabled scopes. Prefer task tools above.
 
 | Pattern | Requires | Notes |
-|---------|----------|-------|
+| --------- | ---------- | ------- |
 | `create_{stem}` | write scope | Deprecated in 0.2.0 |
 | `update_{stem}` | write scope | Deprecated in 0.2.0 |
 | `delete_{stem}` | delete scope | Deprecated in 0.2.0; use `void_document` |

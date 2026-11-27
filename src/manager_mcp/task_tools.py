@@ -13,7 +13,7 @@ from manager_mcp.preconditions import (
 )
 from manager_mcp.scopes import WritePolicy, WritesDeniedError
 from manager_mcp.writable import WRITABLE, WritableResource
-from manager_mcp.write_validate import diff_persisted, validate_write_body
+from manager_mcp.write_validate import diff_persisted, normalize_write_body, validate_write_body
 
 
 def _body_key(body: Any) -> str:
@@ -60,15 +60,56 @@ async def _post(
     fields: dict[str, Any],
 ) -> dict[str, Any]:
     validate_write_body(resource, fields, creating=True)
-    body = await client.post(resource.form_path, json=fields)
+    payload = normalize_write_body(resource, fields)
+    body = await client.post(resource.form_path, json=payload)
     warnings: list[str] = []
     if resource.known_keys and isinstance(body, dict):
         key = body.get("Key") or body.get("key")
         if key:
             persisted = await client.get(f"{resource.form_path}/{key}")
             form = persisted if isinstance(persisted, dict) else None
-            warnings = diff_persisted(resource, fields, form)
+            warnings = diff_persisted(resource, payload, form)
     return {"body": body, "warnings": warnings}
+
+
+async def _accounts_payable_account_key(client: ManagerClient) -> str | None:
+    """Resolve the control Accounts payable account from an existing payment or COA."""
+    payments = await client.get("/payments", params={"skip": 0, "pageSize": 10})
+    if isinstance(payments, dict):
+        for row in payments.get("payments") or []:
+            if not isinstance(row, dict):
+                continue
+            pay_key = row.get("Key") or row.get("key")
+            if not pay_key:
+                continue
+            form = await client.get(f"/payment-form/{pay_key}")
+            if not isinstance(form, dict):
+                continue
+            for line in form.get("Lines") or []:
+                if isinstance(line, dict) and line.get("Account"):
+                    return str(line["Account"])
+    coa = await client.get("/chart-of-accounts", params={"skip": 0, "pageSize": 200})
+    if isinstance(coa, dict):
+        for item in coa.get("chartOfAccounts") or []:
+            if not isinstance(item, dict):
+                continue
+            control = str(item.get("ControlAccount") or item.get("controlAccount") or "")
+            name = str(item.get("Name") or item.get("name") or "")
+            if control == "AccountsPayable" or name.casefold() == "accounts payable":
+                key = item.get("Key") or item.get("key")
+                if key:
+                    return str(key)
+    return None
+
+
+def _allocation_link_warning(warnings: list[str], link_field: str) -> str | None:
+    needle = f".{link_field} "
+    for warning in warnings:
+        if link_field in warning and ("missing after save" in warning or "differs after save" in warning):
+            return warning
+        if needle in warning:
+            return warning
+    return None
 
 
 async def _find_deposit_bank_account(client: ManagerClient) -> dict[str, Any] | None:
@@ -246,6 +287,19 @@ async def record_customer_payment(
             ],
             body=out["body"],
         )
+    link_warning = _allocation_link_warning(out["warnings"], "AccountsReceivableSalesInvoice")
+    if link_warning:
+        return _envelope(
+            "partial",
+            keys={"receipt": key, "invoice": invoice_key},
+            warnings=out["warnings"],
+            next_steps=[
+                "Receipt saved but the sales invoice link did not persist. "
+                "Check Lines[0].AccountsReceivableSalesInvoice and PaidBy, then "
+                "update via update_receipt or void and retry."
+            ],
+            body=out["body"],
+        )
     return _envelope(
         "ok",
         keys={"receipt": key, "invoice": invoice_key},
@@ -264,20 +318,32 @@ async def record_supplier_payment(
     amount: float,
     invoice_key: str,
     reference: str | None = None,
-    paid_by: int = 1,
+    paid_by: int = 2,
     description: str | None = None,
 ) -> dict[str, Any]:
     require_write_scopes(policy, "banking")
+    ap_account = await _accounts_payable_account_key(client)
+    if not ap_account:
+        return _envelope(
+            "partial",
+            keys={},
+            warnings=["Could not resolve Accounts payable control account for payment line."],
+            next_steps=[
+                "Ensure the books have an Accounts payable account, or create a "
+                "payment in Manager once and retry record_supplier_payment."
+            ],
+        )
     line: dict[str, Any] = {
+        "Account": ap_account,
         "Amount": amount,
         "AccountsPayableSupplier": supplier,
-        "AccountsPayablePurchaseInvoice": invoice_key,
+        "PurchaseInvoice": invoice_key,
     }
     fields: dict[str, Any] = {
         "PaidFrom": bank_account,
         "Supplier": supplier,
         "Date": date,
-        "PaidBy": paid_by,
+        "Payee": paid_by,
         "Lines": [line],
     }
     if reference:
@@ -293,9 +359,23 @@ async def record_supplier_payment(
             warnings=[str(exc)],
             next_steps=["Fix payment body and retry record_supplier_payment."],
         )
+    payment_key = _body_key(out["body"])
+    link_warning = _allocation_link_warning(out["warnings"], "PurchaseInvoice")
+    if link_warning:
+        return _envelope(
+            "partial",
+            keys={"payment": payment_key, "invoice": invoice_key},
+            warnings=out["warnings"],
+            next_steps=[
+                "Payment saved but the purchase invoice link did not persist. "
+                "Check Lines[0].PurchaseInvoice, Account (AP), and Payee, then "
+                "update via update_payment or void and retry."
+            ],
+            body=out["body"],
+        )
     return _envelope(
         "ok",
-        keys={"payment": _body_key(out["body"]), "invoice": invoice_key},
+        keys={"payment": payment_key, "invoice": invoice_key},
         body=out["body"],
         warnings=out["warnings"],
     )

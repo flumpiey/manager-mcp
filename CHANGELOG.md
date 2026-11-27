@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.7] - 2026-10-29
+
+### Added
+
+- `automation` write/delete scope for custom buttons (API2 `/custom-buttons`,
+  `/custom-button-form`) with field validation and persistence warnings.
+- Optional `MANAGER_API4_URL` / `ManagerClient.api4_base_url` for future API4
+  calls (CRUD uses API2 on v1).
+
+### Changed
+
+- Custom button paths are no longer globally denylisted; they require the
+  `automation` scope instead. Custom field definition paths remain blocked.
+
 ## [0.2.6] - 2026-08-03
 
 ### Fixed

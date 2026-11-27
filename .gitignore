@@ -48,6 +48,9 @@ dist/
 .eggs/
 *.egg
 .venv/
+.venv.broken/
+.venv-tmp/
+.venv-tmp313/
 venv/
 ENV/
 

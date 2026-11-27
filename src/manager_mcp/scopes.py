@@ -25,6 +25,7 @@ VALID_SCOPES = frozenset(
         "banking",
         "payroll",
         "ledger",
+        "automation",
         # Escape hatch: registers full CRUD set; effective_* expands to all domains.
         "raw",
     }
@@ -67,6 +68,7 @@ RESOURCE_SCOPE: dict[str, str] = {
     "journal_entries": "ledger",
     "depreciation_entries": "ledger",
     "amortization_entries": "ledger",
+    "custom_buttons": "automation",
 }
 
 # Normalized path (no trailing slash, no {key}) -> resource_key
@@ -96,6 +98,7 @@ PATH_TO_RESOURCE: dict[str, str] = {
     "/journal-entry-form": "journal_entries",
     "/depreciation-entry-form": "depreciation_entries",
     "/amortization-entry-form": "amortization_entries",
+    "/custom-button-form": "custom_buttons",
 }
 
 _DENY_EXACT = frozenset(
@@ -114,7 +117,6 @@ _DENY_SUBSTRINGS = (
     "base-currency",
     "foreign-currency",
     "custom-field",
-    "custom-button",
     "theme-form",
     "email-template",
     "email-settings",
@@ -136,6 +138,12 @@ _DENY_REGEX = tuple(
 
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
+_AUTOMATION_PATH_MARKER = "custom-button"
+
+
+def is_automation_gated_path(path: str) -> bool:
+    return _AUTOMATION_PATH_MARKER in _normalize_path(path).casefold()
+
 
 class ScopeConfigError(ValueError):
     """Invalid scope configuration (unknown names, wildcards, legacy envs)."""
@@ -152,9 +160,7 @@ def _normalize_path(path: str) -> str:
     parts = p.rstrip("/").split("/")
     if len(parts) >= 3 and parts[-2].endswith("-form"):
         parts = parts[:-1]
-    elif len(parts) >= 2 and re.fullmatch(
-        r"[0-9a-fA-F-]{36}|\{key\}", parts[-1]
-    ):
+    elif len(parts) >= 2 and re.fullmatch(r"[0-9a-fA-F-]{36}|\{key\}", parts[-1]):
         parts = parts[:-1]
     return "/".join(parts) if parts[0] == "" else "/" + "/".join(parts)
 
@@ -191,8 +197,7 @@ def parse_scope_csv(raw: str | None, *, env_name: str) -> frozenset[str]:
             )
         if t not in VALID_SCOPES:
             raise ScopeConfigError(
-                f"{env_name}: unknown scope {t!r}. "
-                f"Valid scopes: {', '.join(sorted(VALID_SCOPES))}"
+                f"{env_name}: unknown scope {t!r}. Valid scopes: {', '.join(sorted(VALID_SCOPES))}"
             )
     return frozenset(tokens)
 
@@ -220,9 +225,7 @@ class WritePolicy:
         reject_legacy_write_envs(env)
         return cls(
             write_scopes=parse_scope_csv(env.get(WRITE_SCOPES_ENV), env_name=WRITE_SCOPES_ENV),
-            delete_scopes=parse_scope_csv(
-                env.get(DELETE_SCOPES_ENV), env_name=DELETE_SCOPES_ENV
-            ),
+            delete_scopes=parse_scope_csv(env.get(DELETE_SCOPES_ENV), env_name=DELETE_SCOPES_ENV),
         )
 
     @property
@@ -245,15 +248,21 @@ class WritePolicy:
         method = method.upper()
         if method not in WRITE_METHODS:
             return
-        if is_denylisted(path):
-            raise WritesDeniedError(
-                f"{method} {path} is permanently denied (denylist)."
-            )
+        if is_automation_gated_path(path):
+            if method == "DELETE":
+                if "automation" not in self.effective_delete_scopes:
+                    raise WritesDeniedError(
+                        f"{method} {path} requires scope 'automation' in {DELETE_SCOPES_ENV}."
+                    )
+            elif "automation" not in self.effective_write_scopes:
+                raise WritesDeniedError(
+                    f"{method} {path} requires scope 'automation' in {WRITE_SCOPES_ENV}."
+                )
+        elif is_denylisted(path):
+            raise WritesDeniedError(f"{method} {path} is permanently denied (denylist).")
         resource = path_to_resource(path)
         if resource is None:
-            raise WritesDeniedError(
-                f"{method} {path} is not a scoped writable resource."
-            )
+            raise WritesDeniedError(f"{method} {path} is not a scoped writable resource.")
         scope = RESOURCE_SCOPE[resource]
         if method == "DELETE":
             if scope not in self.effective_delete_scopes:
