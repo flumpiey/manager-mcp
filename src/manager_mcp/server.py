@@ -615,7 +615,8 @@ def register_task_tools() -> None:
             name="record_expense",
             description=(
                 "Record an expense via expense_claim (payroll) or purchase_invoice "
-                "(purchases). Requires payroll and/or purchases scope."
+                "(purchases). Requires payroll and/or purchases scope. "
+                "via: auto, expense_claim or purchase_invoice."
             ),
             annotations=_WRITE_ANNOTATIONS,
         )

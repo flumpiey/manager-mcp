@@ -44,16 +44,9 @@ async def test_transfer_between_accounts_returns_ok(
 async def test_post_journal_entry_returns_ok(
     live_client,
     income_account_key,
+    bank_account_key,
 ) -> None:
-    retained = None
-    coa = await live_client.get("/chart-of-accounts", params={"skip": 0, "pageSize": 50})
-    if isinstance(coa, dict):
-        for item in coa.get("chartOfAccounts") or []:
-            if isinstance(item, dict) and item.get("Key") and item["Key"] != income_account_key:
-                retained = str(item["Key"])
-                break
-    if not retained:
-        pytest.skip("integration: need a second account for journal entry")
+    retained = bank_account_key
     out = await post_journal_entry(
         live_client,
         live_client.policy,
@@ -94,7 +87,7 @@ async def test_record_expense_returns_ok(
                 }
             ],
         },
-        via="purchases",
+        via="purchase_invoice",
     )
     key = out["keys"]["purchase_invoice"]
     try:

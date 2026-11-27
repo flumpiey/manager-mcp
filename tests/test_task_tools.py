@@ -198,3 +198,24 @@ async def test_record_expense_refuses_missing_requested_route() -> None:
         await record_expense(None, policy, {"Date": "2026-07-13"}, via="expense_claim")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="via must be"):
         await record_expense(None, policy, {}, via="bogus")  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_dropped_field_warns_on_resource_without_known_keys() -> None:
+    from manager_mcp.task_tools import _post
+    from manager_mcp.writable import WRITABLE
+
+    key = "33333333-3333-3333-3333-333333333333"
+    respx.post(f"{BASE}/inventory-item-form").mock(
+        return_value=httpx.Response(201, json={"Key": key})
+    )
+    respx.get(f"{BASE}/inventory-item-form/{key}").mock(
+        return_value=httpx.Response(200, json={"Key": key, "ItemName": "Widget"})
+    )
+    client = ManagerClient(BASE, "k", policy=WritePolicy(frozenset({"items"}), frozenset()))
+    out = await _post(client, WRITABLE["inventory_items"], {"Name": "Widget", "ItemName": "Widget"})
+    await client.aclose()
+    assert out["warnings"] == [
+        "Name missing after save (Manager drops unknown field names; clone get_record)"
+    ]

@@ -15,6 +15,9 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - Remaining CRUD tools no longer carry the `[DEPRECATED in 0.2.0]` prefix.
+- Every create and update now reads the record back. Resources without a known
+  field list warn on any submitted field that Manager dropped (Manager 26.8
+  returns 201 for unknown field names).
 
 ## [0.2.7] - 2026-10-29
 

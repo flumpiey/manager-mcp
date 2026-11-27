@@ -65,7 +65,7 @@ async def _verify(
     client: ManagerClient, resource: WritableResource, payload: dict[str, Any], body: Any
 ) -> list[str]:
     """Read the saved form back and diff it. Never raises: the write already happened."""
-    if not resource.known_keys or not isinstance(body, dict):
+    if not isinstance(body, dict):
         return []
     key = body.get("Key") or body.get("key")
     if not key:
@@ -74,7 +74,17 @@ async def _verify(
         persisted = await client.get(f"{resource.form_path}/{key}")
     except (ManagerUnavailableError, ManagerApiError, httpx.HTTPStatusError) as exc:
         return [f"Saved as {key} but read-back failed; do not retry the write. Detail: {exc}"]
-    return diff_persisted(resource, payload, persisted if isinstance(persisted, dict) else None)
+    form = persisted if isinstance(persisted, dict) else None
+    if resource.known_keys:
+        return diff_persisted(resource, payload, form)
+    if form is None:
+        return ["could not verify persistence (no form body returned)"]
+    # Manager returns 201 but drops unknown field names; empty values are omitted on read.
+    return [
+        f"{k} missing after save (Manager drops unknown field names; clone get_record)"
+        for k, v in payload.items()
+        if v and k not in form
+    ]
 
 
 async def _accounts_payable_account_key(client: ManagerClient) -> str | None:
