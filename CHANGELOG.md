@@ -22,6 +22,13 @@ All notable changes to this project are documented in this file.
 - `payment_rules` and `receipt_rules` list-only collections (PR #4).
 - Every read-only tool declares the MCP `readOnlyHint` annotation (PR #4).
 
+- `attach_receipt_to_purchase_invoice` (purchases scope): attaches base64 file
+  content, at most 10 MB, to a purchase invoice through Manager's internal upload
+  route, with a Manager user login from `MANAGER_UI_USERNAME` and
+  `MANAGER_UI_PASSWORD`. Every upload passes the purchases write-scope check.
+  The result is `unverified`, because Manager 26.8 cannot list attachments over
+  its API. Originally contributed in PR #4 by gregsteel.
+
 ## [0.3.0] - 2026-11-27
 
 ### Removed

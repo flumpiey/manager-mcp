@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import mimetypes
 import os
 from typing import Any
+from uuid import UUID
 
 import httpx
 
+from manager_mcp.attachments import action_url
 from manager_mcp.scopes import WRITE_METHODS, WritePolicy
 
 BASE_QUERY_KEYS = frozenset({"term", "sortBy", "sortByDesc", "skip", "pageSize", "fields"})
@@ -142,6 +145,50 @@ class ManagerClient:
         if not response.content:
             return None
         return response.json()
+
+    async def upload_attachment(self, invoice_key: str, file_name: str, data: bytes) -> None:
+        """Attach a file to a purchase invoice through Manager's internal upload route.
+
+        Scope-checked like any purchase invoice write. Needs a Manager user login,
+        because the route ignores X-API-KEY. Manager returns nothing to read back.
+        """
+        key = str(UUID(invoice_key))
+        self.policy.authorize("POST", f"/purchase-invoice-form/{key}")
+        username = os.environ.get("MANAGER_UI_USERNAME", "").strip()
+        password = os.environ.get("MANAGER_UI_PASSWORD", "").strip()
+        if not username or not password:
+            raise ConfigError(
+                "MANAGER_UI_USERNAME and MANAGER_UI_PASSWORD are required to upload attachments."
+            )
+        envelope = await self.get("/purchase-invoices", params={"pageSize": 1})
+        business = (envelope or {}).get("business") if isinstance(envelope, dict) else None
+        business_name = business.get("name") if isinstance(business, dict) else None
+        if not business_name:
+            raise ManagerApiError("Could not read the business name from /purchase-invoices.")
+        root = self.base_url.rsplit("/api2", 1)[0]
+        url = action_url(root, "NewAttachment", business_name, key)
+        mime = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
+        try:
+            response = await self._client.post(
+                url,
+                files={file_name: (file_name, data, mime)},
+                auth=(username, password),
+                follow_redirects=False,
+            )
+        except httpx.RequestError as exc:
+            raise ManagerUnavailableError(
+                f"Manager.io is not reachable at {root}. "
+                f"The upload may have saved: check the invoice's Attachments tab. Detail: {exc}"
+            ) from exc
+        content_type = response.headers.get("content-type", "")
+        if response.status_code >= 300 or "text/html" in content_type:
+            location = response.headers.get("location")
+            raise ManagerApiError(
+                f"Attachment upload got HTTP {response.status_code}"
+                + (f", redirect to {location}" if location else "")
+                + f", content-type {content_type!r}. No attachment was confirmed. "
+                "A redirect usually means the Manager user login was refused."
+            )
 
     async def aclose(self) -> None:
         if self._owns_client:

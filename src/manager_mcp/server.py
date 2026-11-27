@@ -576,6 +576,24 @@ def register_task_tools() -> None:
         async def issue_purchase_invoice(fields: dict[str, Any]) -> dict[str, Any]:
             return await _tt.issue_purchase_invoice(get_client(), get_policy(), fields)
 
+        @mcp.tool(
+            name="attach_receipt_to_purchase_invoice",
+            description=(
+                "Attach a file (base64 content plus file name, max 10 MB) to an existing "
+                "purchase invoice's Attachments list. Requires purchases scope and "
+                "MANAGER_UI_USERNAME/MANAGER_UI_PASSWORD. Returns status 'unverified': "
+                "Manager cannot list attachments over its API, so check the invoice's "
+                "Attachments tab."
+            ),
+            annotations=_WRITE_ANNOTATIONS,
+        )
+        async def attach_receipt_to_purchase_invoice(
+            invoice_key: str, file_name: str, file_content_base64: str
+        ) -> dict[str, Any]:
+            return await _tt.attach_receipt_to_purchase_invoice(
+                get_client(), get_policy(), invoice_key, file_name, file_content_base64
+            )
+
     if "quotes" in effective:
 
         @mcp.tool(

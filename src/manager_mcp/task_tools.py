@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Any
+from uuid import UUID
 
 import httpx
 
@@ -169,6 +172,54 @@ async def issue_sales_invoice(
         keys={"sales_invoice": _body_key(out["body"])},
         body=out["body"],
         warnings=out["warnings"],
+    )
+
+
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+
+async def attach_receipt_to_purchase_invoice(
+    client: ManagerClient,
+    policy: WritePolicy,
+    invoice_key: str,
+    file_name: str,
+    file_content_base64: str,
+) -> dict[str, Any]:
+    """Attach base64 file content to a purchase invoice (no server paths or URLs)."""
+    require_write_scopes(policy, "purchases")
+    try:
+        key = str(UUID(invoice_key))
+    except ValueError as exc:
+        raise ValueError(f"invoice_key {invoice_key!r} is not a valid key.") from exc
+    name = file_name.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if not name:
+        raise ValueError("file_name is empty.")
+    # Refuse oversize input before decoding it (base64 is 4/3 of the bytes).
+    if len(file_content_base64) > (MAX_ATTACHMENT_BYTES * 4) // 3 + 4:
+        raise ValueError(f"The file is larger than the {MAX_ATTACHMENT_BYTES} byte limit.")
+    try:
+        data = base64.b64decode(file_content_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"file_content_base64 is not valid base64: {exc}") from exc
+    if not data:
+        raise ValueError("The file is empty.")
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        raise ValueError(f"The file is larger than the {MAX_ATTACHMENT_BYTES} byte limit.")
+    try:
+        await client.get(f"{WRITABLE['purchase_invoices'].form_path}/{key}")
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            raise ValueError(f"Purchase invoice {key} not found.") from exc
+        raise
+    await client.upload_attachment(key, name, data)
+    return _envelope(
+        "unverified",
+        keys={"purchase_invoice": key, "file_name": name},
+        warnings=[
+            "Manager accepted the upload, but its API cannot list attachments, "
+            "so the attachment was not read back."
+        ],
+        next_steps=[f"Check the Attachments tab of purchase invoice {key} in Manager."],
     )
 
 
