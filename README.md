@@ -1,169 +1,47 @@
-<p align="center">
-  <a href="https://www.manager.io/">
-    <img src="docs/manager-icon.svg" alt="Manager.io" width="72" height="72">
-  </a>
-</p>
-
-# manager-mcp
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/flumpiey/manager-mcp/main/assets/banner-dark.svg">
+  <img src="https://raw.githubusercontent.com/flumpiey/manager-mcp/main/assets/banner-light.svg" alt="MANAGER-MCP: read-first, scope-gated access to Manager.io accounting for AI assistants" width="1280">
+</picture>
 
 <!-- mcp-name: io.github.flumpiey/manager-mcp -->
 
-**MCP server for self-hosted [Manager.io](https://www.manager.io/): ask your AI about invoices, balances, and books.**
+[![Licence](https://img.shields.io/github/license/flumpiey/manager-mcp?style=for-the-badge&color=06004f&labelColor=f2ff26&label=licence)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/flumpiey/manager-mcp/ci.yml?branch=main&style=for-the-badge&color=06004f&labelColor=f2ff26&label=ci)](https://github.com/flumpiey/manager-mcp/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20to%203.14-06004f?style=for-the-badge&labelColor=f2ff26)](pyproject.toml)
+[![PyPI](https://img.shields.io/pypi/v/manager-mcp?style=for-the-badge&color=06004f&labelColor=f2ff26&label=pypi)](https://pypi.org/project/manager-mcp/)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](https://www.python.org/)
-[![MCP](https://img.shields.io/badge/MCP-stdio-green.svg)](https://modelcontextprotocol.io/)
-[![CI](https://github.com/flumpiey/manager-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/flumpiey/manager-mcp/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/manager-mcp.svg)](https://pypi.org/project/manager-mcp/)
+## What it is and why
 
-## What is Manager.io?
+`manager-mcp` is a stdio [Model Context Protocol](https://modelcontextprotocol.io/) server for [Manager.io](https://www.manager.io/), the self-hosted accounting package. It lets Claude, Cursor, VS Code Copilot and other MCP hosts answer questions such as "who owes me money?" against your live books. AI write access to a ledger is risky, so the server starts read-only and adds write tools only for the domains you name.
 
-[Manager.io](https://www.manager.io/) is free, self-hosted accounting software for Windows, macOS, and Linux (also available as [Cloud Edition](https://www.manager.io/cloud-edition)). It covers sales, purchases, banking, payroll, and the full ledger, with an HTTP API (`/api2`) for automation.
+## Features
 
-This project wires that API into the [Model Context Protocol](https://modelcontextprotocol.io/) so Cursor, Claude, VS Code Copilot, and other MCP hosts can query your live books in natural language.
-
-Useful Manager.io links:
-
-- [Download](https://www.manager.io/download)
-- [Guides](https://www.manager.io/guides)
-- [Forum](https://forum.manager.io)
-- [Releases](https://www.manager.io/releases)
-
-## What this server does
-
-Default is **read-only**. You get:
-
-- **10 read tools** - discovery, six searchable collections, seven report shortcuts
-- **Task tools (opt-in)** - intent-shaped writes such as `record_customer_payment`, `issue_sales_invoice`, `record_customer_deposit` (register when matching write scopes are set)
-- **Deprecated CRUD tools** - per-resource `create_*` / `update_*` / `delete_*` still register under scopes until **0.3.0**; prefer task tools
-- **`raw` escape hatch** - restores the full CRUD set for advanced use
-- **Hard denylist** - access tokens, chart of accounts forms, tax/currency, email templates, and similar high-risk paths stay blocked even when writes are on
-
-Transport is **stdio**. No HTTP server. No global install required if you use [`uv`](https://docs.astral.sh/uv/) / `uvx`.
-
-## Branding / icons
-
-- **stdio hosts (Cursor, Claude Desktop via `mcp.json`):** the server advertises Manager branding in MCP `serverInfo.icons` (embedded PNG data URI, plus a GitHub raw HTTPS fallback).
-- **Cursor plugin:** [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) uses [`docs/manager-icon.svg`](docs/manager-icon.svg).
-- **Claude Desktop Extension:** pack [`mcpb/`](mcpb/) (includes `icon.png`). See Installation → Claude Desktop below.
-- **Claude.ai remote connectors:** Claude.ai ignores `serverInfo.icons` and uses the **root-domain favicon** of the connector URL. If you host a remote MCP later, serve [`docs/favicon.ico`](docs/favicon.ico) at the registrable domain root (e.g. `https://acme.com/favicon.ico` for `https://mcp.acme.com/...`).
-
-## Requirements
-
-- Python ≥ 3.10 (pulled in automatically by `uvx`)
-- [uv](https://docs.astral.sh/uv/) (provides `uvx`)
-- A reachable Manager.io API: `MANAGER_API_URL` + `MANAGER_API_KEY`
-
-### Access token
-
-1. In Manager, open **Settings → Access Tokens**.
-2. Create a token and copy the value into `MANAGER_API_KEY`.
-3. Set `MANAGER_API_URL` to your API base (desktop often `http://127.0.0.1:55667/api2`).
-
-`manager-mcp` sends the token as the `X-API-KEY` header. Full walkthrough: [Access Tokens](https://www.manager.io/guides/access-tokens).
+- **Read-only by default.** With no scopes set, the server registers 10 read tools and nothing that can change data.
+- **Scoped writes.** `MANAGER_MCP_WRITE_SCOPES` and `MANAGER_MCP_DELETE_SCOPES` take a comma-separated list of domains. Delete is never implied by write.
+- **Task tools.** Intent-shaped writes such as `record_customer_payment` (receipt plus invoice allocation) instead of raw form posts.
+- **Hard denylist.** Access tokens, chart of accounts forms, tax codes, currencies, exchange rates, starting balances, bank reconciliation, custom field definitions, themes and email settings stay blocked even with writes on.
+- **Fail-loud configuration.** Unknown scopes, wildcards (`*`, `all`) and the legacy `MANAGER_MCP_ALLOW_WRITES` style variables stop the server at start-up.
+- **Customer deposit workflow.** Deposits post to a deposit bank or cash account, never to income. A missing account returns `precondition_failed` with setup steps.
+- **Packaged for hosts.** PyPI package for `uvx`, a Claude Desktop extension (`.mcpb`), a Cursor plugin and an entry in the MCP Registry as `io.github.flumpiey/manager-mcp`.
+- **Companion agent skill.** [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md) tells the model to call `list_resources` first and to verify after writes.
 
 ## Quick start
 
-Run the [PyPI](https://pypi.org/project/manager-mcp/) package with [`uvx`](https://docs.astral.sh/uv/guides/tools/):
+Requirements: [uv](https://docs.astral.sh/uv/) and a reachable Manager.io API. In Manager, open **Settings > Access Tokens**, create a token, and note your API base URL (include `/api2`).
 
 ```bash
+export MANAGER_API_URL="http://<manager-host>:<port>/api2"
+export MANAGER_API_KEY="<access-token>"
 uvx manager-mcp
 ```
 
-Paste a client config below, set `MANAGER_API_URL` / `MANAGER_API_KEY`, restart the host, then ask: *“Who owes me money?”* or *“Show bank balances.”*
-
-From a git clone (dev): `uvx --from git+https://github.com/flumpiey/manager-mcp manager-mcp` or `uv run --directory /path/to/manager-mcp manager-mcp`.
-
-## Installation
-
-Configs below pull [`manager-mcp`](https://pypi.org/project/manager-mcp/) from PyPI. Leave write-scope env vars unset for read-only.
-
-<details>
-<summary><strong>Cursor</strong></summary>
-
-**Plugin (Configure UI for URL, key, and scopes):** this repo is a Cursor plugin via [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) + root [`mcp.json`](mcp.json).
-
-1. Symlink or copy the clone to `~/.cursor/plugins/local/manager-mcp` (Windows: `%USERPROFILE%\.cursor\plugins\local\manager-mcp`).
-2. Reload the window.
-3. Open **Plugins → Configure** on `manager-mcp`. Set **Manager API URL** and **Manager API key**. Leave **Write scopes** / **Delete scopes** empty for read-only, or paste a CSV such as `quotes` or `quotes,orders`.
-4. Confirm the `manager` MCP server is enabled under Customize / MCP.
-
-Marketplace listing is a separate submit at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish).
-
-**Manual `mcp.json`:** project [`.cursor/mcp.json`](.cursor/mcp.json) or user-wide `~/.cursor/mcp.json`.
-
-From PyPI:
-
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-Local editable (dev):
-
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/manager-mcp", "manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-Optional scoped writes in the `env` block:
-
-```json
-"MANAGER_MCP_WRITE_SCOPES": "quotes",
-"MANAGER_MCP_DELETE_SCOPES": "quotes"
-```
-
-Restart Cursor after saving. Confirm `manager` under MCP settings.
-
-</details>
-
-<details>
-<summary><strong>Claude Desktop</strong></summary>
-
-**Desktop Extension (`.mcpb`):** download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from [GitHub Releases](https://github.com/flumpiey/manager-mcp/releases). Use **v0.2.6** or later.
-
-1. Open Claude Desktop → **Settings → Extensions**.
-2. Open **Advanced settings** → **Install Extension…**
-3. Select `mcpb.mcpb`. Review permissions, enter **Manager API URL** and **Manager API key**, then click **Install**.
-4. Leave **Write scopes** and **Delete scopes** empty for read-only.
-5. Restart Claude Desktop if tools do not appear.
-
-Build your own bundle from a clone:
+The server speaks MCP over stdio, so a host normally starts it for you. Add it to Claude Code:
 
 ```bash
-npx @anthropic-ai/mcpb pack mcpb
+claude mcp add manager --env MANAGER_API_URL=http://<manager-host>:<port>/api2 --env MANAGER_API_KEY=<access-token> -- uvx manager-mcp
 ```
 
-On Windows, double-click often does nothing and dragging the file into chat attaches it to the conversation instead of installing it. Use **Install Extension…** in Settings.
-
-**Manual `mcp.json` config:** edit the Claude Desktop config, then restart the app.
-
-| OS | Path |
-|----|------|
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+Most other hosts take the same JSON block:
 
 ```json
 {
@@ -172,176 +50,46 @@ On Windows, double-click often does nothing and dragging the file into chat atta
       "command": "uvx",
       "args": ["manager-mcp"],
       "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
+        "MANAGER_API_URL": "http://<manager-host>:<port>/api2",
+        "MANAGER_API_KEY": "<access-token>"
       }
     }
   }
 }
 ```
 
-Local clone:
+| Host | Config file | Top-level key |
+| --- | --- | --- |
+| Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` | `mcpServers` |
+| Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` | `mcpServers` |
+| Cursor | `.cursor/mcp.json` or `~/.cursor/mcp.json` | `mcpServers` |
+| VS Code / Copilot | `.vscode/mcp.json` (add `"type": "stdio"`) | `servers` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `mcpServers` |
+| Zed | `settings.json` | `context_servers` |
+| Cline | `cline_mcp_settings.json` | `mcpServers` |
 
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/manager-mcp", "manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
+Restart the host after you save, then ask "show bank balances".
+
+<details>
+<summary><strong>Claude Desktop extension (.mcpb)</strong></summary>
+
+1. Download [`mcpb.mcpb`](https://github.com/flumpiey/manager-mcp/releases/latest/download/mcpb.mcpb) from the latest release (v0.2.6 or later).
+2. In Claude Desktop, open **Settings > Extensions > Advanced settings > Install Extension...** and select the file.
+3. Enter **Manager API URL** and **Manager API key**. Leave **Write scopes** and **Delete scopes** empty for read-only.
+
+On Windows, a double-click or a drag into chat does not install the file. Use **Install Extension...** instead. To build the bundle from a clone: `npx @anthropic-ai/mcpb pack mcpb`.
 
 </details>
 
 <details>
-<summary><strong>Claude Code</strong></summary>
+<summary><strong>Cursor plugin</strong></summary>
 
-Add via CLI:
-
-```bash
-claude mcp add manager --env MANAGER_API_URL=http://127.0.0.1:55667/api2 --env MANAGER_API_KEY=your-token -- uvx manager-mcp
-```
-
-Or edit `~/.claude.json` / project MCP config:
-
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>VS Code / GitHub Copilot</strong></summary>
-
-Create [`.vscode/mcp.json`](.vscode/mcp.json) in the project root:
-
-```json
-{
-  "servers": {
-    "manager": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-Local editable:
-
-```json
-{
-  "servers": {
-    "manager": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/manager-mcp", "manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-Reload the window. Open Copilot Chat and confirm the `manager` tools are available.
-
-</details>
-
-<details>
-<summary><strong>Windsurf</strong></summary>
-
-Edit `~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or the Windsurf MCP settings UI:
-
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-Restart Windsurf after saving.
-
-</details>
-
-<details>
-<summary><strong>Zed</strong></summary>
-
-Add under `context_servers` in Zed `settings.json` (Agent Panel → settings also works):
-
-```json
-{
-  "context_servers": {
-    "manager": {
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Cline</strong></summary>
-
-Edit the Cline MCP settings file (`cline_mcp_settings.json` via the Cline MCP UI):
-
-```json
-{
-  "mcpServers": {
-    "manager": {
-      "command": "uvx",
-      "args": ["manager-mcp"],
-      "env": {
-        "MANAGER_API_URL": "http://127.0.0.1:55667/api2",
-        "MANAGER_API_KEY": "your-token"
-      }
-    }
-  }
-}
-```
+This repo is a Cursor plugin through [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json) and the root [`mcp.json`](mcp.json). Copy or symlink the clone to `~/.cursor/plugins/local/manager-mcp`, reload the window, then open **Plugins > Configure** to set the URL, key and scopes. The plugin also loads the `skills/` folder.
 
 </details>
 
 <details>
 <summary><strong>Continue</strong></summary>
-
-In `.continue/config.yaml`:
 
 ```yaml
 mcpServers:
@@ -350,190 +98,123 @@ mcpServers:
     args:
       - manager-mcp
     env:
-      MANAGER_API_URL: http://127.0.0.1:55667/api2
-      MANAGER_API_KEY: your-token
+      MANAGER_API_URL: http://<manager-host>:<port>/api2
+      MANAGER_API_KEY: <access-token>
 ```
 
 </details>
 
-<details>
-<summary><strong>Generic / any stdio MCP host</strong></summary>
+## Configuration
 
-Any host that can spawn a stdio MCP server:
+| Name | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `MANAGER_API_URL` | yes | none | Manager API base URL, including `/api2` when your instance needs it. |
+| `MANAGER_API_KEY` | yes | none | Access token, sent as the `X-API-KEY` header. |
+| `MANAGER_MCP_WRITE_SCOPES` | no | empty (read-only) | Comma-separated domains that get create and update tools. |
+| `MANAGER_MCP_DELETE_SCOPES` | no | empty | Comma-separated domains that get delete tools and `void_document`. |
+| `MANAGER_API4_URL` | no | `MANAGER_API_URL` with `/api2` replaced by `/api4` | API4 base for the client's API4 helper. No current tool calls API4. |
+| `MANAGER_BUSINESS_NAME` | no | empty | `business` query value for API4 calls. No current tool calls API4. |
+| `TEST_MANAGER_API_URL` | integration tests only | none | Sandbox business URL for `pytest -m integration`. |
+| `TEST_MANAGER_API_KEY` | integration tests only | none | Sandbox business token for `pytest -m integration`. |
 
-| Field | Value |
-| ------- | ------- |
-| Command | `uvx` |
-| Args | `manager-mcp` |
-| Env | `MANAGER_API_URL`, `MANAGER_API_KEY` (+ optional write scopes) |
+Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`, `automation`, `raw`. Setting `MANAGER_MCP_ALLOW_WRITES`, `ALLOW_WRITES` or `MANAGER_MCP_WRITES` stops the server with an error. See [`.env.example`](.env.example).
 
-```bash
-uvx manager-mcp
-```
-
-Dev from a clone: `uv run --directory /path/to/manager-mcp manager-mcp`.
-
-`npx` only runs npm packages. This is a Python package; use `uvx`.
-
-</details>
-
-## Environment
-
-| Variable | Required | Notes |
-| ---------- | ---------- | ------- |
-| `MANAGER_API_URL` | yes | Opaque base URL (include `/api2` when needed) |
-| `MANAGER_API_KEY` | yes | Sent as `X-API-KEY`; never logged |
-| `MANAGER_MCP_WRITE_SCOPES` | no | Comma-separated domains for create/update. Empty = no writes. |
-| `MANAGER_MCP_DELETE_SCOPES` | no | Comma-separated domains for delete only. Never implied by WRITE_SCOPES. |
-
-Valid scopes: `quotes`, `orders`, `parties`, `items`, `sales`, `purchases`, `banking`, `payroll`, `ledger`, `automation`, `raw`. No wildcards (`*`, `all`).
-
-**Recommended** (covers most bookkeeping without 82 tools):
+A narrow set covers most bookkeeping:
 
 ```json
 "MANAGER_MCP_WRITE_SCOPES": "banking,sales,parties",
 "MANAGER_MCP_DELETE_SCOPES": "sales,banking"
 ```
 
-Default with no scopes: **10 tools**. All nine domain scopes plus every CRUD verb: up to **82 tools**. Use `raw` only when you need the full CRUD escape hatch.
+## Tools
 
-Legacy `MANAGER_MCP_ALLOW_WRITES` / `ALLOW_WRITES` / `MANAGER_MCP_WRITES` hard-fail if set. Use the scoped vars instead.
+The server registers 10 tools with no scopes and 98 with every domain scope on.
 
-See [`.env.example`](.env.example). Prefer a secret manager for the API key in production configs.
+### Read tools (always on)
 
-## Write scopes and task tools
+| Tool | Access | What it does |
+| --- | --- | --- |
+| `list_resources` | read | Lists curated capabilities, the read-only flag and the live write and delete scopes. |
+| `list_records` | read | Searches and pages a collection: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `bank_accounts`. |
+| `get_record` | read | Fetches one record by key through its form endpoint. `chart_of_accounts` is list only. |
+| `aged_receivables` | read | Outstanding customer balances. |
+| `aged_payables` | read | Outstanding supplier balances. |
+| `bank_balances` | read | Bank and cash balance snapshot. |
+| `trial_balance` | read | Trial balance for an optional `from_date` / `to_date`. |
+| `profit_and_loss` | read | Profit and loss for an optional period. |
+| `balance_sheet` | read | Balance sheet for an optional period. |
+| `tax_summary` | read | Tax summary snapshot. |
 
-When a scope is listed in `MANAGER_MCP_WRITE_SCOPES`, the server registers **task tools** for that domain plus deprecated CRUD twins. `MANAGER_MCP_DELETE_SCOPES` enables `void_document` and `delete_*` per domain.
+### Task tools (opt-in)
 
-### Task tools (preferred)
+| Tool | Access | Registers when | What it does |
+| --- | --- | --- | --- |
+| `issue_sales_invoice` | write | `sales` | Issues a sales invoice with inline lines. |
+| `issue_purchase_invoice` | write | `purchases` | Issues a purchase invoice. |
+| `issue_quote` | write | `quotes` | Issues a sales quote, or a purchase quote with `purchase=true`. |
+| `issue_deposit_invoice` | write | `quotes` | Issues a sales quote styled as a deposit document (not revenue). |
+| `convert_quote_to_invoice` | write | `quotes` and `sales` | Converts a sales quote to a sales invoice. |
+| `record_customer_payment` | write | `banking` | Records a receipt and allocates it to an open sales invoice. |
+| `record_supplier_payment` | write | `banking` | Records a payment allocated to a purchase invoice. |
+| `record_customer_deposit` | write | `banking` | Records money received before an invoice exists, into a deposit account. |
+| `transfer_between_accounts` | write | `banking` | Moves money between bank or cash accounts. |
+| `record_expense` | write | `payroll` or `purchases` | Records an expense as an expense claim or a purchase invoice. |
+| `post_journal_entry` | write | `ledger` | Posts a generic journal entry. |
+| `apply_deposit_to_invoice` | write | `ledger` | Applies a held deposit to a sales invoice through a journal entry. |
+| `void_document` | delete | any delete scope | Deletes a document by resource name and key; needs that resource's delete scope. |
+| `create_customer`, `update_customer`, `create_supplier`, `update_supplier` | write | `parties` | Creates or updates a customer or supplier. |
+| `delete_customer`, `delete_supplier` | delete | `parties` (delete) | Deletes a customer or supplier. |
 
-| Tool | Scopes | Purpose |
-| ------ | -------- | --------- |
-| `create_customer`, `create_supplier` | parties | Single-resource party setup |
-| `issue_sales_invoice` | sales | Issue invoice with inline lines |
-| `issue_purchase_invoice` | purchases | Issue purchase invoice |
-| `issue_quote` | quotes | Issue sales or purchase quote |
-| `convert_quote_to_invoice` | quotes + sales | Convert quote to invoice |
-| `record_customer_payment` | banking | Receipt + invoice allocation |
-| `record_supplier_payment` | banking | Payment + invoice allocation |
-| `record_expense` | payroll and/or purchases | Expense claim or purchase invoice |
-| `transfer_between_accounts` | banking | Inter-account transfer |
-| `post_journal_entry` | ledger | Generic journal entry |
-| `void_document` | matching delete scope | Void by resource name + key |
-| `record_customer_deposit` | banking | Deposit before invoice exists |
-| `issue_deposit_invoice` | quotes | Deposit document (quote) |
-| `apply_deposit_to_invoice` | ledger | Apply deposit via journal |
+### Deprecated CRUD tools
 
-Bodies for composite tools use Manager-native JSON where noted. Clone `get_record` templates; do not invent field names.
+Each enabled scope also registers `create_*` and `update_*` (write) and `delete_*` (delete) for its resources. Their descriptions carry `[DEPRECATED in 0.2.0; use task tools]`. Prefer the task tools.
 
-### Deprecated CRUD (0.2.0, removed 0.3.0)
-
-Per-resource `create_*` / `update_*` / `delete_*` still register when their domain scope is enabled. Descriptions are prefixed `[DEPRECATED in 0.2.0; use task tools]` except `create_customer` / `create_supplier`. Set `raw` in `MANAGER_MCP_WRITE_SCOPES` to register CRUD without deprecation prefixes.
-
-| Scope | Resources (CRUD when enabled) |
-| ------- | ------------------------------- |
+| Scope | Resources |
+| --- | --- |
 | `quotes` | sales_quotes, purchase_quotes |
 | `orders` | sales_orders, purchase_orders |
-| `parties` | customers, suppliers |
 | `items` | inventory_items, non_inventory_items |
 | `sales` | sales_invoices, credit_notes, delivery_notes |
 | `purchases` | purchase_invoices, debit_notes, goods_receipts |
 | `banking` | receipts, payments, inter_account_transfers, bank_accounts |
 | `payroll` | employees, payslips, expense_claims |
 | `ledger` | journal_entries, depreciation_entries, amortization_entries |
-| `automation` | custom_buttons (`create_custom_button`, …; no server-side invoke API) |
+| `automation` | custom_buttons |
 
-Example with recommended scopes only:
+### Permission and safety model
 
-```json
-"MANAGER_MCP_WRITE_SCOPES": "banking,sales,parties",
-"MANAGER_MCP_DELETE_SCOPES": "sales"
-```
+1. **Registration gate.** A write tool exists only when its scope is in `MANAGER_MCP_WRITE_SCOPES`. A delete tool exists only when its scope is in `MANAGER_MCP_DELETE_SCOPES`.
+2. **Request gate.** The HTTP client checks every `POST`, `PUT`, `PATCH` and `DELETE` against the scope map again before it sends the request. An unmapped path is refused.
+3. **Denylist.** Paths for access tokens, chart of accounts and other `*-account-form` paths (except bank or cash accounts), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields, themes and email templates or settings are refused for every scope, `raw` included.
+4. **Automation gate.** Custom button paths need `automation` in the matching scope, because a button can call external systems.
+5. **`raw` escape hatch.** `raw` expands to every domain scope. Use it only when you need the full CRUD set.
 
-**Denylist (always blocked):** access-token forms, chart-of-accounts / `*-account-form` (except bank-or-cash), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, **custom field definitions**, themes, email templates/settings.
-
-**Scope-gated (not denylisted globally):** custom buttons require `automation` in write/delete scopes; endpoints/HTML may call external systems.
-
-## Customer deposit workflow
-
-A **deposit is not revenue**. Money received before delivery must not be booked to an income account. Confirm tax/VAT treatment with your accountant.
-
-1. Ensure a **Customer deposits** bank/cash account exists in Manager (Settings → Bank and Cash Accounts).
-2. `record_customer_deposit` - posts cash to that account. If the account is missing, the tool returns `precondition_failed` with exact setup steps (Option A: guide only, no auto-create).
-3. `issue_deposit_invoice` (optional) - quote styled as a deposit document for the customer.
-4. `issue_sales_invoice` when the real invoice is raised.
-5. `apply_deposit_to_invoice` - journal entry moving deposit balance to the invoice (clone an existing journal via `get_record`).
-
-Required scopes: `banking`, `quotes` (deposit doc), `ledger` (apply), `sales` (final invoice via MCP).
-
-## Migration from 0.1.x
-
-- **0.2.0**: Task tools added; CRUD tools deprecated but still present under scopes.
-- **0.3.0**: CRUD tools removed (except `create_customer` / `create_supplier`). Use task tools or `raw` scope.
-- Update `MANAGER_MCP_WRITE_SCOPES` to the recommended narrow set above instead of enabling all domains.
-
-## Tools
-
-### Read tools
-
-| Tool | Purpose | Period (`from_date` / `to_date`) |
-| ------ | --------- | ---------------------------------- |
-| `list_resources` | Discovery; reports `read_only` + live write/delete scopes | n/a |
-| `list_records` | Search/page a curated collection | n/a |
-| `get_record` | Fetch one record via `{path}-form/{key}` | n/a |
-| `aged_receivables` | Outstanding / aging customers | Accepted; may be unsupported on this view |
-| `aged_payables` | Aging suppliers | Accepted; may be unsupported on this view |
-| `bank_balances` | Bank/cash **balances snapshot** | Accepted; may be unsupported on this view |
-| `trial_balance` | Trial balance | Forwarded as `fromDate` / `toDate` |
-| `profit_and_loss` | P&L | Forwarded as `fromDate` / `toDate` |
-| `balance_sheet` | Balance sheet | Forwarded as `fromDate` / `toDate` |
-| `tax_summary` | Tax summary | Accepted; may be unsupported on this view |
-
-Collections for `list_records` / `get_record`: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `bank_accounts`.
-
-`chart_of_accounts` is list/search only (no single-form GET).
-
-**Bank dual path (intentional):** `bank_balances` answers “what are my balances?”; `list_records` / `get_record` on `bank_accounts` answers “find account X and show detail.”
-
-### Write tools (deprecated)
-
-Registered only for resources in enabled scopes. Prefer task tools above.
-
-| Pattern | Requires | Notes |
-| --------- | ---------- | ------- |
-| `create_{stem}` | write scope | Deprecated in 0.2.0 |
-| `update_{stem}` | write scope | Deprecated in 0.2.0 |
-| `delete_{stem}` | delete scope | Deprecated in 0.2.0; use `void_document` |
-
-## Agent Skill
-
-Companion skill: [`skills/manager-accounting/SKILL.md`](skills/manager-accounting/SKILL.md).
-
-The Cursor plugin discovers this skill from `skills/`. Without the plugin, copy or symlink that folder into your agent skills path. It tells the model to call `list_resources` first, verify after writes, and which report tools to prefer.
+A deposit is not revenue. Confirm tax and VAT treatment of deposits with your accountant.
 
 ## Development
 
 ```bash
+git clone https://github.com/flumpiey/manager-mcp.git
+cd manager-mcp
 uv sync --extra dev
-uv run manager-mcp
-```
-
-Offline tests only (respx). No live Manager required:
-
-```bash
 uv run ruff check src tests
 uv run pytest
+uv build
 ```
 
-GitHub Actions matrix: Python 3.10 and 3.12.
+`uv run pytest` runs the offline suite (respx mocks, no live Manager). Run `uv run pytest -m integration` with `TEST_MANAGER_API_URL` and `TEST_MANAGER_API_KEY` set against a sandbox business. CI runs ruff and pytest on Python 3.10 and 3.12. Run the server from the clone with `uv run manager-mcp`.
 
-## Caveats
+Limits:
 
-- One process ↔ one `MANAGER_API_URL`. Multi-instance routing is out of scope.
-- Multi-business disambiguation on a shared host is **unverified**. Do not claim multi-business support until validated against a live multi-business setup.
-- Vendored `src/manager_mcp/spec/api2.json` is provenance only; runtime always hits the live URL.
-- ChatGPT Apps need a hosted HTTP MCP endpoint. This package is stdio-only.
+- One process serves one `MANAGER_API_URL`.
+- Multi-business disambiguation on a shared host is unverified.
+- The vendored `src/manager_mcp/spec/api2.json` is provenance only; the server always calls the live API.
+- Transport is stdio only, so hosts that need a hosted HTTP endpoint cannot use it.
 
-## License
+## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+Built by Dru Connold. [flumpiey.github.io](https://flumpiey.github.io) / [malvadev.com](https://malvadev.com)
