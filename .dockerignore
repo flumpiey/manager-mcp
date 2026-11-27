@@ -1,0 +1,13 @@
+.venv/
+.env
+.env.*
+!.env.example
+tests/
+.git/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+mcpb/
+mcpb.mcpb
+docs/
