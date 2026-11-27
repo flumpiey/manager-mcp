@@ -34,6 +34,18 @@ _READ_ANNOTATIONS = {
     "openWorldHint": True,
 }
 
+# Document types whose forms carry Lines; one form read per document scanned.
+_LINE_SEARCH_RESOURCES = frozenset(
+    {
+        "sales_invoices",
+        "purchase_invoices",
+        "sales_quotes",
+        "purchase_quotes",
+        "sales_orders",
+        "purchase_orders",
+    }
+)
+
 _ICON_PATH = Path(__file__).resolve().parent / "assets" / "icon.png"
 _ICON_HTTPS = (
     "https://raw.githubusercontent.com/flumpiey/manager-mcp/main/docs/icon-512.png"
@@ -149,7 +161,7 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
 
 @mcp.tool(
     description=(
-        "List curated Manager.io capabilities. Default is read-only (10 tools). "
+        "List curated Manager.io capabilities. Default is read-only (11 tools). "
         "Task tools register when write scopes match. create_*/delete_* for documents "
         "that task tools cover register only with the raw scope."
     ),
@@ -272,14 +284,15 @@ async def get_record(resource: str, key: str) -> dict[str, Any]:
 
 @mcp.tool(
     description=(
-        "Search text inside LINE ITEM descriptions (Lines[].LineDescription) — e.g. sales_invoices, "
-        "purchase_invoices, sales_quotes, purchase_quotes. list_records' `term` only matches "
+        "Search text inside LINE ITEM descriptions. resource: sales_invoices, "
+        "purchase_invoices, sales_quotes, purchase_quotes, sales_orders or purchase_orders. "
+        "list_records' `term` only matches "
         "header-level fields (Reference, Customer/Supplier, the invoice's own Description); it "
         "never sees text inside individual line items, so a search for text that only appears "
         "on a line will come back empty there. Use this tool instead when the text might live "
         "on a line. Pages the collection's headers, fetches each record's form, and returns "
         "only records with at least one matching line (case-insensitive substring match). "
-        "Costs one extra Manager API call per header scanned, so page_size defaults small; "
+        "Costs one extra Manager API call per header scanned; page_size is capped at 50; "
         "page with `skip` (see `has_more`) to cover a whole collection."
     ),
     annotations=_READ_ANNOTATIONS,
@@ -290,12 +303,13 @@ async def search_line_items(
     skip: int = 0,
     page_size: int = 25,
 ) -> dict[str, Any]:
-    desc = resolve(resource)
-    if desc is None or desc.kind != "collection" or not desc.supports_form:
+    if resource not in _LINE_SEARCH_RESOURCES:
         raise ValueError(
-            f"Unknown collection '{resource}' or line-item search unsupported. "
-            "Use list_resources for supported names."
+            f"Unknown collection '{resource}' for line-item search. "
+            f"Use one of: {', '.join(sorted(_LINE_SEARCH_RESOURCES))}."
         )
+    desc = resolve(resource)
+    page_size = max(1, min(page_size, 50))
     client = get_client()
     try:
         header_body = await client.get(desc.path, params={"skip": skip, "pageSize": page_size})
@@ -313,7 +327,7 @@ async def search_line_items(
     for item in headers:
         if not isinstance(item, dict):
             continue
-        key = item.get("key")   # lowercase — matches the list-endpoint's field naming
+        key = item.get("Key") or item.get("key")
         if not key:
             continue
         path = form_path(resource, key)
@@ -326,12 +340,12 @@ async def search_line_items(
         lines = form_body.get("Lines") if isinstance(form_body, dict) else None
         if not isinstance(lines, list):
             continue
-        matched_lines = [
-            line.get("LineDescription")
+        texts = [
+            str(line.get("LineDescription") or line.get("Description") or "")
             for line in lines
             if isinstance(line, dict)
-            and needle in str(line.get("LineDescription") or "").lower()
         ]
+        matched_lines = [text for text in texts if needle in text.lower()]
         if matched_lines:
             matches.append(
                 {
@@ -352,7 +366,10 @@ async def search_line_items(
     }
 
 
-@mcp.tool(description="Aged receivables / outstanding customer balances (read-only snapshot).", annotations=_READ_ANNOTATIONS)
+@mcp.tool(
+    description="Aged receivables / outstanding customer balances (read-only snapshot).",
+    annotations=_READ_ANNOTATIONS,
+)
 async def aged_receivables(
     from_date: str | None = None,
     to_date: str | None = None,
