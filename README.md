@@ -126,7 +126,7 @@ A narrow set covers most bookkeeping:
 
 ## Tools
 
-The server registers 10 tools with no scopes and 98 with every domain scope on.
+The server registers 10 tools with no scopes, 80 with every domain scope on, and 98 with `raw`.
 
 ### Read tools (always on)
 
@@ -163,9 +163,9 @@ The server registers 10 tools with no scopes and 98 with every domain scope on.
 | `create_customer`, `update_customer`, `create_supplier`, `update_supplier` | write | `parties` | Creates or updates a customer or supplier. |
 | `delete_customer`, `delete_supplier` | delete | `parties` (delete) | Deletes a customer or supplier. |
 
-### Deprecated CRUD tools
+### Per-resource CRUD tools
 
-Each enabled scope also registers `create_*` and `update_*` (write) and `delete_*` (delete) for its resources. Their descriptions carry `[DEPRECATED in 0.2.0; use task tools]`. Prefer the task tools.
+Each enabled scope also registers `create_*` and `update_*` (write) and `delete_*` (delete) for its resources. For documents that task tools cover, `create_*` and `delete_*` register only with the `raw` scope; use the task tools and `void_document`. These are sales and purchase invoices, quotes, receipts, payments, inter-account transfers, journal entries and expense claims. `update_*` registers for every resource.
 
 | Scope | Resources |
 | --- | --- |
@@ -185,7 +185,7 @@ Each enabled scope also registers `create_*` and `update_*` (write) and `delete_
 2. **Request gate.** The HTTP client checks every `POST`, `PUT`, `PATCH` and `DELETE` against the scope map again before it sends the request. An unmapped path is refused.
 3. **Denylist.** Paths for access tokens, chart of accounts and other `*-account-form` paths (except bank or cash accounts), bank reconciliation, customer portal, starting balances, tax codes, exchange rates, currencies, custom fields, themes and email templates or settings are refused for every scope, `raw` included.
 4. **Automation gate.** Custom button paths need `automation` in the matching scope, because a button can call external systems.
-5. **`raw` escape hatch.** `raw` expands to every domain scope. Use it only when you need the full CRUD set.
+5. **`raw` escape hatch.** `raw` expands to every domain scope and restores `create_*` and `delete_*` for task-covered documents. Use it only when you need the full CRUD set.
 
 A deposit is not revenue. Confirm tax and VAT treatment of deposits with your accountant.
 

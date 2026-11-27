@@ -56,7 +56,20 @@ _policy: WritePolicy | None = None
 _write_tools_registered = False
 _task_tools_registered = False
 
-_CRUD_EXEMPT_FROM_DEPRECATION = frozenset({"customer", "supplier"})
+# Task tools create these, and void_document deletes them; raw restores create_*/delete_*.
+_TASK_COVERED = frozenset(
+    {
+        "sales_invoices",
+        "purchase_invoices",
+        "sales_quotes",
+        "purchase_quotes",
+        "receipts",
+        "payments",
+        "inter_account_transfers",
+        "journal_entries",
+        "expense_claims",
+    }
+)
 
 
 def get_policy() -> WritePolicy:
@@ -122,8 +135,8 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
 @mcp.tool(
     description=(
         "List curated Manager.io capabilities. Default is read-only (10 tools). "
-        "Task tools register when write scopes match; CRUD tools are deprecated "
-        "unless raw scope is set."
+        "Task tools register when write scopes match. create_*/delete_* for documents "
+        "that task tools cover register only with the raw scope."
     )
 )
 async def list_resources() -> dict[str, Any]:
@@ -151,8 +164,8 @@ async def list_resources() -> dict[str, Any]:
         boundary = (
             "Scoped writes enabled. Prefer task tools (issue_sales_invoice, "
             "record_customer_payment, record_customer_deposit, …). "
-            "Per-resource CRUD is deprecated in 0.2.0 (removed in 0.3.0) unless "
-            "raw is in WRITE_SCOPES. write_scopes="
+            "create_*/delete_* for task-covered documents need raw in WRITE_SCOPES; "
+            "use void_document to delete. write_scopes="
             f"{write_scopes}; effective_write={effective_write}; "
             f"delete_scopes={delete_scopes}. Verify writes with list_records/get_record."
         )
@@ -369,14 +382,6 @@ _DELETE_ANNOTATIONS = {
 }
 
 
-def _deprecation_prefix(policy: WritePolicy, stem: str) -> str:
-    if "raw" in policy.write_scopes:
-        return ""
-    if stem in _CRUD_EXEMPT_FROM_DEPRECATION:
-        return ""
-    return "[DEPRECATED in 0.2.0; use task tools] "
-
-
 def _scopes_for_registration(policy: WritePolicy) -> set[str]:
     if "raw" in policy.write_scopes or "raw" in policy.delete_scopes:
         return set(DOMAIN_SCOPES)
@@ -389,32 +394,31 @@ def register_write_tools() -> None:
     if _write_tools_registered:
         return
     policy = get_policy()
-
-    def prefix_fn(stem: str) -> str:
-        return _deprecation_prefix(policy, stem)
+    raw = "raw" in policy.write_scopes or "raw" in policy.delete_scopes
 
     for scope in sorted(_scopes_for_registration(policy)):
         for w in implemented_for_scope(scope):
             stem = w.tool_stem
-            dep = prefix_fn(stem)
+            covered = w.name in _TASK_COVERED and not raw
             if w.scope in policy.effective_write_scopes:
-                create_fn = _make_create_tool(w.name)
+                if not covered:
+                    create_fn = _make_create_tool(w.name)
+                    mcp.tool(
+                        name=f"create_{stem}",
+                        description=create_fn.__doc__ or "",
+                        annotations=_WRITE_ANNOTATIONS,
+                    )(create_fn)
                 update_fn = _make_update_tool(w.name)
                 mcp.tool(
-                    name=f"create_{stem}",
-                    description=dep + (create_fn.__doc__ or ""),
-                    annotations=_WRITE_ANNOTATIONS,
-                )(create_fn)
-                mcp.tool(
                     name=f"update_{stem}",
-                    description=dep + (update_fn.__doc__ or ""),
+                    description=update_fn.__doc__ or "",
                     annotations=_WRITE_ANNOTATIONS,
                 )(update_fn)
-            if w.scope in policy.effective_delete_scopes:
+            if w.scope in policy.effective_delete_scopes and not covered:
                 delete_fn = _make_delete_tool(w.name)
                 mcp.tool(
                     name=f"delete_{stem}",
-                    description=dep + (delete_fn.__doc__ or ""),
+                    description=delete_fn.__doc__ or "",
                     annotations=_DELETE_ANNOTATIONS,
                 )(delete_fn)
     _write_tools_registered = True

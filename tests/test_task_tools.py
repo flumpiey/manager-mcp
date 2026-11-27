@@ -102,21 +102,37 @@ def test_task_tools_register_with_banking_scope(monkeypatch: pytest.MonkeyPatch)
     assert "issue_sales_invoice" not in captured
 
 
-def test_crud_deprecated_prefix_without_raw(monkeypatch: pytest.MonkeyPatch) -> None:
-    from manager_mcp.scopes import WritePolicy
-    from manager_mcp.server import _deprecation_prefix
+def _write_tool_names(monkeypatch: pytest.MonkeyPatch, write: str, delete: str) -> set[str]:
+    from manager_mcp.server import register_write_tools
 
-    policy = WritePolicy(frozenset({"banking"}), frozenset())
-    assert "[DEPRECATED" in _deprecation_prefix(policy, "receipt")
-    assert _deprecation_prefix(policy, "customer") == ""
+    monkeypatch.setenv("MANAGER_MCP_WRITE_SCOPES", write)
+    monkeypatch.setenv("MANAGER_MCP_DELETE_SCOPES", delete)
+    reset_client()
+    names: set[str] = set()
+
+    def fake_tool(*_args: object, **kwargs: object):
+        def deco(fn: object) -> object:
+            names.add(str(kwargs.get("name")))
+            return fn
+
+        return deco
+
+    monkeypatch.setattr(mcp, "tool", fake_tool)
+    register_write_tools()
+    return names
 
 
-def test_crud_no_deprecation_with_raw() -> None:
-    from manager_mcp.scopes import WritePolicy
-    from manager_mcp.server import _deprecation_prefix
+def test_task_covered_crud_needs_raw(monkeypatch: pytest.MonkeyPatch) -> None:
+    names = _write_tool_names(monkeypatch, "banking", "banking")
+    assert "create_receipt" not in names
+    assert "delete_receipt" not in names
+    assert "update_receipt" in names
+    assert {"create_bank_account", "delete_bank_account"} <= names
 
-    policy = WritePolicy(frozenset({"raw"}), frozenset())
-    assert _deprecation_prefix(policy, "receipt") == ""
+
+def test_raw_restores_full_crud(monkeypatch: pytest.MonkeyPatch) -> None:
+    names = _write_tool_names(monkeypatch, "raw", "raw")
+    assert {"create_receipt", "delete_receipt", "create_sales_invoice"} <= names
 
 
 def _capture_task_tools(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:

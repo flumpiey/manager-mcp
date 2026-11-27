@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-11-27
+
+### Removed
+
+- `create_*` and `delete_*` tools for documents that task tools cover (sales and
+  purchase invoices, sales and purchase quotes, receipts, payments,
+  inter-account transfers, journal entries, expense claims). Use the task tools
+  and `void_document`, or set the `raw` scope to restore them. `update_*` tools
+  and CRUD for all other resources remain.
+
+### Changed
+
+- Remaining CRUD tools no longer carry the `[DEPRECATED in 0.2.0]` prefix.
+
 ## [0.2.7] - 2026-10-29
 
 ### Added
