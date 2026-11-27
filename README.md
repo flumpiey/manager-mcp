@@ -133,7 +133,7 @@ The server registers 10 tools with no scopes, 80 with every domain scope on, and
 | Tool | Access | What it does |
 | --- | --- | --- |
 | `list_resources` | read | Lists curated capabilities, the read-only flag and the live write and delete scopes. |
-| `list_records` | read | Searches and pages a collection: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `bank_accounts`. |
+| `list_records` | read | Searches and pages a collection: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `divisions`, `bank_accounts`. `divisions` is read-only setup data that resolves a transaction line's `Division` key. |
 | `get_record` | read | Fetches one record by key through its form endpoint. `chart_of_accounts` is list only. |
 | `aged_receivables` | read | Outstanding customer balances. |
 | `aged_payables` | read | Outstanding supplier balances. |

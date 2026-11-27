@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `divisions` collection for `list_records` / `get_record`, with the
+  `/division-form/{key}` single-record form. Transaction lines carry an
+  optional `Division` field holding a division key, and there was previously
+  no way to resolve one through the bridge - divisions were absent from the
+  curated resource map. Read-only: divisions are setup data, so no
+  `create_division` tool and no new write scope.
+
 ## [0.3.0] - 2026-11-27
 
 ### Removed
