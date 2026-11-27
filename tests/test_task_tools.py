@@ -219,3 +219,8 @@ async def test_dropped_field_warns_on_resource_without_known_keys() -> None:
     assert out["warnings"] == [
         "Name missing after save (Manager drops unknown field names; clone get_record)"
     ]
+
+
+def test_rules_collections_never_get_write_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    names = _write_tool_names(monkeypatch, "raw", "raw")
+    assert not [n for n in names if "rule" in n]

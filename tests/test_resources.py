@@ -10,6 +10,8 @@ CORE_COLLECTIONS = {
     "sales_invoices",
     "purchase_invoices",
     "chart_of_accounts",
+    "payment_rules",
+    "receipt_rules",
     "divisions",
     "bank_accounts",
 }

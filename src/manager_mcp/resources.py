@@ -69,6 +69,24 @@ _BASE_RESOURCES: dict[str, ResourceDescriptor] = {
         form_template="/purchase-invoice-form/{key}",
         items_key="purchaseInvoices",
     ),
+    "payment_rules": _collection(
+        "payment_rules",
+        "/payment-rules",
+        "Payment rules collection (auto-categorization rules for outgoing bank "
+        "transactions, formerly \"Bank Rules\"; list/search only, no create/update/"
+        "delete endpoint in the Manager API)",
+        form_template=None,
+        items_key="paymentRules",
+    ),
+    "receipt_rules": _collection(
+        "receipt_rules",
+        "/receipt-rules",
+        "Receipt rules collection (auto-categorization rules for incoming bank "
+        "transactions; list/search only, no create/update/delete endpoint in the "
+        "Manager API)",
+        form_template=None,
+        items_key="receiptRules",
+    ),
     "chart_of_accounts": _collection(
         "chart_of_accounts",
         "/chart-of-accounts",

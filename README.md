@@ -16,7 +16,8 @@
 
 ## Features
 
-- **Read-only by default.** With no scopes set, the server registers 10 read tools and nothing that can change data.
+- **Read-only by default.** With no scopes set, the server registers 11 read tools and nothing that can change data. Every read tool declares the MCP read-only annotation.
+- **Remote HTTP mode.** Opt-in Streamable HTTP with Google sign-in, an email allowlist and 24-hour tokens, for remote MCP connectors behind a TLS reverse proxy.
 - **Scoped writes.** `MANAGER_MCP_WRITE_SCOPES` and `MANAGER_MCP_DELETE_SCOPES` take a comma-separated list of domains. Delete is never implied by write.
 - **Task tools.** Intent-shaped writes such as `record_customer_payment` (receipt plus invoice allocation) instead of raw form posts.
 - **Hard denylist.** Access tokens, chart of accounts forms, tax codes, currencies, exchange rates, starting balances, bank reconciliation, custom field definitions, themes and email settings stay blocked even with writes on.
@@ -112,6 +113,13 @@ mcpServers:
 | `MANAGER_API_KEY` | yes | none | Access token, sent as the `X-API-KEY` header. |
 | `MANAGER_MCP_WRITE_SCOPES` | no | empty (read-only) | Comma-separated domains that get create and update tools. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | empty | Comma-separated domains that get delete tools and `void_document`. |
+| `MANAGER_MCP_TRANSPORT` | no | `stdio` | `stdio` or `http`. Any other value stops the server. |
+| `MANAGER_MCP_HTTP_HOST` | no | `127.0.0.1` | HTTP bind address. The container image sets `0.0.0.0`. |
+| `MANAGER_MCP_HTTP_PORT` | no | `8080` | HTTP bind port. |
+| `MANAGER_MCP_OAUTH_GOOGLE_CLIENT_ID` | HTTP mode | none | Google OAuth client ID. |
+| `MANAGER_MCP_OAUTH_GOOGLE_CLIENT_SECRET` | HTTP mode | none | Google OAuth client secret. |
+| `MANAGER_MCP_OAUTH_BASE_URL` | HTTP mode | none | Public HTTPS URL of the reverse proxy. The Google redirect URI is `<base URL>/auth/callback`. |
+| `MANAGER_MCP_ALLOWED_EMAILS` | HTTP mode | none | Comma-separated addresses allowed to sign in. Unverified Google emails are refused. |
 | `MANAGER_UI_USERNAME` | for attachments | none | Manager user for the attachment upload route, which ignores the API key. Use a dedicated least-privilege user. |
 | `MANAGER_UI_PASSWORD` | for attachments | none | Password for `MANAGER_UI_USERNAME`. |
 | `TEST_MANAGER_API_URL` | integration tests only | none | Sandbox business URL for `pytest -m integration`. |
@@ -128,14 +136,15 @@ A narrow set covers most bookkeeping:
 
 ## Tools
 
-The server registers 10 tools with no scopes, 80 with every domain scope on, and 98 with `raw`.
+The server registers 11 tools with no scopes, 82 with every domain scope on, and 100 with `raw`.
 
 ### Read tools (always on)
 
 | Tool | Access | What it does |
 | --- | --- | --- |
 | `list_resources` | read | Lists curated capabilities, the read-only flag and the live write and delete scopes. |
-| `list_records` | read | Searches and pages a collection: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `divisions`, `bank_accounts`. `divisions` is read-only setup data that resolves a transaction line's `Division` key. |
+| `list_records` | read | Searches and pages a collection: `customers`, `suppliers`, `sales_invoices`, `purchase_invoices`, `chart_of_accounts`, `divisions`, `bank_accounts`, `payment_rules`, `receipt_rules`. `divisions` is read-only setup data that resolves a transaction line's `Division` key. The rules collections list bank auto-categorisation rules and never get write tools. |
+| `search_line_items` | read | Finds documents by text in their line descriptions, which `list_records` header search misses. Covers sales and purchase invoices, quotes and orders; at most 50 documents per call. |
 | `get_record` | read | Fetches one record by key through its form endpoint. `chart_of_accounts` is list only. |
 | `aged_receivables` | read | Outstanding customer balances. |
 | `aged_payables` | read | Outstanding supplier balances. |
@@ -192,6 +201,25 @@ Each enabled scope also registers `create_*` and `update_*` (write) and `delete_
 
 A deposit is not revenue. Confirm tax and VAT treatment of deposits with your accountant.
 
+## Remote HTTP mode
+
+Stdio stays the default. Set `MANAGER_MCP_TRANSPORT=http` to serve Streamable HTTP at `/mcp`, with an unauthenticated `/health` check.
+
+1. Create a Google OAuth web client. Add `<base URL>/auth/callback` as a redirect URI.
+2. Set the HTTP mode variables in [Configuration](#configuration). The server exits at start-up if any is missing.
+3. Put a TLS reverse proxy in front. The server speaks plain HTTP and binds to `127.0.0.1` unless you set `MANAGER_MCP_HTTP_HOST`.
+
+Container:
+
+```bash
+docker build -t manager-mcp .
+docker run --env-file .env -p 127.0.0.1:8080:8080 manager-mcp
+```
+
+Publish the port on loopback only, as above, so plain HTTP is reachable only through the proxy. The image runs as a non-root user and contains no secrets.
+
+Sign-in tokens last 24 hours. The allowlist is read at start-up: a removed address keeps access until its token lapses, or until you restart. MCP clients register their own callback URLs, and a consent screen guards each new client.
+
 ## Development
 
 ```bash
@@ -211,7 +239,7 @@ Limits:
 - Attachments use an internal Manager route, confirmed on 26.8.4.3664 and 26.8.27.0. A Manager update can break it, and uploads cannot be read back over the API.
 - Multi-business disambiguation on a shared host is unverified.
 - The vendored `src/manager_mcp/spec/api2.json` is provenance only; the server always calls the live API.
-- Transport is stdio only, so hosts that need a hosted HTTP endpoint cannot use it.
+- HTTP mode supports Google sign-in only, and one deployment serves one business.
 
 ## Licence
 

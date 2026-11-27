@@ -182,3 +182,69 @@ async def test_bank_dual_tool_descriptions() -> None:
     tools = {t.name: t for t in await mcp.list_tools()}
     assert "bank_accounts" in (tools["bank_balances"].description or "")
     assert "bank_balances" in (tools["list_records"].description or "")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_line_items_finds_line_only_match() -> None:
+    respx.get(f"{BASE}/sales-invoices").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "totalRecords": 2,
+                "salesInvoices": [
+                    {"Key": "inv-1", "Reference": "1", "Customer": "Acme"},
+                    {"Key": "inv-2", "Reference": "2", "Customer": "Beta"},
+                ],
+            },
+        )
+    )
+    respx.get(f"{BASE}/sales-invoice-form/inv-1").mock(
+        return_value=httpx.Response(
+            200,
+            json={"Lines": [{"Description": "Widget bracket, powder-coated"}]},
+        )
+    )
+    respx.get(f"{BASE}/sales-invoice-form/inv-2").mock(
+        return_value=httpx.Response(200, json={"Lines": [{"Description": "Consulting"}]})
+    )
+    out = await _call(
+        "search_line_items",
+        {"resource": "sales_invoices", "term": "bracket"},
+    )
+    assert out["scanned"] == 2
+    assert [m["Key"] for m in out["matches"]] == ["inv-1"]
+    assert out["matches"][0]["matched_lines"] == ["Widget bracket, powder-coated"]
+    assert out["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_search_line_items_unknown_resource() -> None:
+    with pytest.raises(Exception, match="Unknown collection"):
+        await _call("search_line_items", {"resource": "nope", "term": "x"})
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_search_line_items_caps_page_size_and_reads_line_description() -> None:
+    route = respx.get(f"{BASE}/purchase-orders").mock(
+        return_value=httpx.Response(
+            200, json={"totalRecords": 1, "purchaseOrders": [{"key": "po-1"}]}
+        )
+    )
+    respx.get(f"{BASE}/purchase-order-form/po-1").mock(
+        return_value=httpx.Response(200, json={"Lines": [{"LineDescription": "Steel BRACKET"}]})
+    )
+    out = await _call(
+        "search_line_items",
+        {"resource": "purchase_orders", "term": "bracket", "page_size": 500},
+    )
+    assert route.calls.last.request.url.params["pageSize"] == "50"
+    assert out["matches"][0]["matched_lines"] == ["Steel BRACKET"]
+
+
+@pytest.mark.asyncio
+async def test_every_default_tool_is_annotated_read_only() -> None:
+    tools = await mcp.list_tools()
+    assert len(tools) == 11
+    assert all(t.annotations and t.annotations.readOnlyHint for t in tools)
