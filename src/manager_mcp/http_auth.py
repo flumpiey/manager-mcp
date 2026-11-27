@@ -10,6 +10,7 @@ MCP is single-tenant, so AllowlistedGoogleProvider adds that check itself.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -23,7 +24,8 @@ CLIENT_ID_ENV = "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_ID"
 CLIENT_SECRET_ENV = "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_SECRET"
 BASE_URL_ENV = "MANAGER_MCP_OAUTH_BASE_URL"
 ALLOWED_EMAILS_ENV = "MANAGER_MCP_ALLOWED_EMAILS"
-AUTH_SESSION_TIMEOUT_SECONDS = 365 * 24 * 60 * 60
+# A removed address keeps access until its token lapses, so keep this short.
+AUTH_SESSION_TIMEOUT_SECONDS = 24 * 60 * 60
 
 
 class TransportConfigError(ValueError):
@@ -41,8 +43,9 @@ class AllowlistedGoogleProvider(GoogleProvider):
         access_token = await super().verify_token(token)
         if access_token is None:
             return None
-        email = (access_token.claims or {}).get("email", "")
-        if email.lower() not in self._allowed_emails:
+        claims = access_token.claims or {}
+        email = str(claims.get("email") or "")
+        if email.lower() not in self._allowed_emails or claims.get("email_verified") is not True:
             return None
         return access_token
 
@@ -64,12 +67,14 @@ def build_run_kwargs(environ: dict[str, str] | None = None) -> dict[str, Any]:
         raise TransportConfigError(f"{TRANSPORT_ENV} must be 'stdio' or 'http', got {transport!r}")
 
     client_id = env.get(CLIENT_ID_ENV, "").strip()
+    client_secret = env.get(CLIENT_SECRET_ENV, "").strip()
     base_url = env.get(BASE_URL_ENV, "").strip()
     allowed_emails_raw = env.get(ALLOWED_EMAILS_ENV, "").strip()
     missing = [
         name
         for name, value in (
             (CLIENT_ID_ENV, client_id),
+            (CLIENT_SECRET_ENV, client_secret),
             (BASE_URL_ENV, base_url),
             (ALLOWED_EMAILS_ENV, allowed_emails_raw),
         )
@@ -83,14 +88,17 @@ def build_run_kwargs(environ: dict[str, str] | None = None) -> dict[str, Any]:
     auth = AllowlistedGoogleProvider(
         allowed_emails=_split_csv(allowed_emails_raw),
         client_id=client_id,
-        client_secret=env.get(CLIENT_SECRET_ENV) or None,
+        client_secret=client_secret,
         base_url=base_url,
         required_scopes=["openid", "email"],
         fastmcp_access_token_expiry_seconds=AUTH_SESSION_TIMEOUT_SECONDS,
     )
+    # Google token checks put the access token in the URL; httpx logs URLs at INFO.
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     return {
         "transport": "http",
-        "host": env.get(HOST_ENV, "0.0.0.0").strip(),
+        "host": env.get(HOST_ENV, "127.0.0.1").strip(),
         "port": int(env.get(PORT_ENV, "8080")),
         "auth": auth,
     }

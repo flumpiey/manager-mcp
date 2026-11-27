@@ -44,7 +44,7 @@ def test_http_builds_kwargs_with_defaults() -> None:
         }
     )
     assert kwargs["transport"] == "http"
-    assert kwargs["host"] == "0.0.0.0"
+    assert kwargs["host"] == "127.0.0.1"
     assert kwargs["port"] == 8080
     auth = kwargs["auth"]
     assert auth._allowed_emails == frozenset({"me@example.com", "other@example.com"})
@@ -54,7 +54,7 @@ def test_http_respects_host_and_port_overrides() -> None:
     kwargs = build_run_kwargs(
         {
             "MANAGER_MCP_TRANSPORT": "http",
-            "MANAGER_MCP_HTTP_HOST": "127.0.0.1",
+            "MANAGER_MCP_HTTP_HOST": "0.0.0.0",
             "MANAGER_MCP_HTTP_PORT": "9090",
             "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_ID": "client-id",
             "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_SECRET": "secret",
@@ -62,11 +62,11 @@ def test_http_respects_host_and_port_overrides() -> None:
             "MANAGER_MCP_ALLOWED_EMAILS": "me@example.com",
         }
     )
-    assert kwargs["host"] == "127.0.0.1"
+    assert kwargs["host"] == "0.0.0.0"
     assert kwargs["port"] == 9090
 
 
-def test_http_auth_session_timeout_is_one_year() -> None:
+def test_http_auth_session_timeout_is_one_day() -> None:
     kwargs = build_run_kwargs(
         {
             "MANAGER_MCP_TRANSPORT": "http",
@@ -76,7 +76,35 @@ def test_http_auth_session_timeout_is_one_year() -> None:
             "MANAGER_MCP_ALLOWED_EMAILS": "me@example.com",
         }
     )
-    assert kwargs["auth"]._fastmcp_access_token_expiry_seconds == 365 * 24 * 60 * 60
+    assert kwargs["auth"]._fastmcp_access_token_expiry_seconds == 24 * 60 * 60
+
+
+def test_http_requires_client_secret() -> None:
+    with pytest.raises(TransportConfigError, match="MANAGER_MCP_OAUTH_GOOGLE_CLIENT_SECRET"):
+        build_run_kwargs(
+            {
+                "MANAGER_MCP_TRANSPORT": "http",
+                "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_ID": "client-id",
+                "MANAGER_MCP_OAUTH_BASE_URL": "https://manager-mcp.example.com",
+                "MANAGER_MCP_ALLOWED_EMAILS": "me@example.com",
+            }
+        )
+
+
+def test_http_mode_silences_url_logging() -> None:
+    import logging
+
+    logging.getLogger("httpx").setLevel(logging.INFO)
+    build_run_kwargs(
+        {
+            "MANAGER_MCP_TRANSPORT": "http",
+            "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_ID": "client-id",
+            "MANAGER_MCP_OAUTH_GOOGLE_CLIENT_SECRET": "secret",
+            "MANAGER_MCP_OAUTH_BASE_URL": "https://manager-mcp.example.com",
+            "MANAGER_MCP_ALLOWED_EMAILS": "me@example.com",
+        }
+    )
+    assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
 
 
 @pytest.mark.asyncio
@@ -94,12 +122,12 @@ async def test_verify_token_rejects_email_outside_allowlist(
         base_url="https://manager-mcp.example.com",
     )
 
-    def fake_verify(token: str, *, email: str) -> AccessToken:
+    def fake_verify(token: str, *, email: str, verified: bool = True) -> AccessToken:
         return AccessToken(
             token=token,
             client_id="client-id",
             scopes=["openid", "email"],
-            claims={"email": email},
+            claims={"email": email, "email_verified": verified},
         )
 
     async def verify_allowed(self: object, token: str) -> AccessToken | None:
@@ -114,4 +142,10 @@ async def test_verify_token_rejects_email_outside_allowlist(
     assert (await provider.verify_token("tok")) is not None
 
     monkeypatch.setattr(GoogleProvider, "verify_token", verify_denied)
+    assert (await provider.verify_token("tok")) is None
+
+    async def verify_unverified(self: object, token: str) -> AccessToken | None:
+        return fake_verify(token, email="allowed@example.com", verified=False)
+
+    monkeypatch.setattr(GoogleProvider, "verify_token", verify_unverified)
     assert (await provider.verify_token("tok")) is None
