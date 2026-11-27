@@ -112,6 +112,8 @@ mcpServers:
 | `MANAGER_API_KEY` | yes | none | Access token, sent as the `X-API-KEY` header. |
 | `MANAGER_MCP_WRITE_SCOPES` | no | empty (read-only) | Comma-separated domains that get create and update tools. |
 | `MANAGER_MCP_DELETE_SCOPES` | no | empty | Comma-separated domains that get delete tools and `void_document`. |
+| `MANAGER_UI_USERNAME` | for attachments | none | Manager user for the attachment upload route, which ignores the API key. Use a dedicated least-privilege user. |
+| `MANAGER_UI_PASSWORD` | for attachments | none | Password for `MANAGER_UI_USERNAME`. |
 | `TEST_MANAGER_API_URL` | integration tests only | none | Sandbox business URL for `pytest -m integration`. |
 | `TEST_MANAGER_API_KEY` | integration tests only | none | Sandbox business token for `pytest -m integration`. |
 
@@ -159,6 +161,7 @@ The server registers 10 tools with no scopes, 80 with every domain scope on, and
 | `record_expense` | write | `payroll` or `purchases` | Records an expense as an expense claim or a purchase invoice. |
 | `post_journal_entry` | write | `ledger` | Posts a generic journal entry. |
 | `apply_deposit_to_invoice` | write | `ledger` | Applies a held deposit to a sales invoice through a journal entry. |
+| `attach_receipt_to_purchase_invoice` | write | `purchases` | Attaches a file (base64, max 10 MB) to a purchase invoice's Attachments list. Needs a Manager user login. Returns `unverified`, because Manager cannot list attachments over its API. |
 | `void_document` | delete | any delete scope | Deletes a document by resource name and key; needs that resource's delete scope. |
 | `create_customer`, `update_customer`, `create_supplier`, `update_supplier` | write | `parties` | Creates or updates a customer or supplier. |
 | `delete_customer`, `delete_supplier` | delete | `parties` (delete) | Deletes a customer or supplier. |
@@ -205,6 +208,7 @@ uv build
 Limits:
 
 - One process serves one `MANAGER_API_URL`.
+- Attachments use an internal Manager route, confirmed on 26.8.4.3664 and 26.8.27.0. A Manager update can break it, and uploads cannot be read back over the API.
 - Multi-business disambiguation on a shared host is unverified.
 - The vendored `src/manager_mcp/spec/api2.json` is provenance only; the server always calls the live API.
 - Transport is stdio only, so hosts that need a hosted HTTP endpoint cannot use it.
