@@ -149,3 +149,10 @@ async def test_verify_token_rejects_email_outside_allowlist(
 
     monkeypatch.setattr(GoogleProvider, "verify_token", verify_unverified)
     assert (await provider.verify_token("tok")) is None
+
+    # Real tokeninfo responses carry the string "true", not a bool.
+    async def verify_string_true(self: object, token: str) -> AccessToken | None:
+        return fake_verify(token, email="allowed@example.com", verified="true")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(GoogleProvider, "verify_token", verify_string_true)
+    assert (await provider.verify_token("tok")) is not None

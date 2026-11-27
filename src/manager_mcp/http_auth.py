@@ -45,7 +45,9 @@ class AllowlistedGoogleProvider(GoogleProvider):
             return None
         claims = access_token.claims or {}
         email = str(claims.get("email") or "")
-        if email.lower() not in self._allowed_emails or claims.get("email_verified") is not True:
+        # Google tokeninfo returns email_verified as the string "true", userinfo as a bool.
+        verified = claims.get("email_verified") in (True, "true")
+        if email.lower() not in self._allowed_emails or not verified:
             return None
         return access_token
 
