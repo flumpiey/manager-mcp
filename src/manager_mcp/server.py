@@ -9,9 +9,12 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 from mcp.types import Icon
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse, Response
 
 from manager_mcp import task_tools as _tt
 from manager_mcp.client import ManagerClient
+from manager_mcp.http_auth import build_run_kwargs
 from manager_mcp.resources import all_resources, extract_items, form_path, resolve
 from manager_mcp.scopes import DOMAIN_SCOPES, WritePolicy
 from manager_mcp.writable import WRITABLE, implemented_for_scope
@@ -23,6 +26,25 @@ _PERIOD_ALIASES = {
     "from": "fromDate",
     "to": "toDate",
 }
+
+_READ_ANNOTATIONS = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
+
+# Document types whose forms carry Lines; one form read per document scanned.
+_LINE_SEARCH_RESOURCES = frozenset(
+    {
+        "sales_invoices",
+        "purchase_invoices",
+        "sales_quotes",
+        "purchase_quotes",
+        "sales_orders",
+        "purchase_orders",
+    }
+)
 
 _ICON_PATH = Path(__file__).resolve().parent / "assets" / "icon.png"
 _ICON_HTTPS = (
@@ -51,6 +73,11 @@ mcp = FastMCP(
     website_url="https://www.manager.io/",
     icons=server_icons(),
 )
+
+
+@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+async def health(_request: Request) -> Response:
+    return PlainTextResponse("ok")
 _client: ManagerClient | None = None
 _policy: WritePolicy | None = None
 _write_tools_registered = False
@@ -134,10 +161,11 @@ async def _fetch_report(name: str, **period: Any) -> dict[str, Any]:
 
 @mcp.tool(
     description=(
-        "List curated Manager.io capabilities. Default is read-only (10 tools). "
+        "List curated Manager.io capabilities. Default is read-only (11 tools). "
         "Task tools register when write scopes match. create_*/delete_* for documents "
         "that task tools cover register only with the raw scope."
-    )
+    ),
+    annotations=_READ_ANNOTATIONS,
 )
 async def list_resources() -> dict[str, Any]:
     policy = get_policy()
@@ -185,7 +213,8 @@ async def list_resources() -> dict[str, Any]:
         "purchase_invoices, chart_of_accounts, bank_accounts. Also writable domains "
         "when present in discovery (e.g. receipts, payments, sales_quotes). "
         "bank_accounts is the searchable collection; use bank_balances for snapshot balances."
-    )
+    ),
+    annotations=_READ_ANNOTATIONS,
 )
 async def list_records(
     resource: str,
@@ -234,7 +263,8 @@ async def list_records(
         "Fetch one collection record by GUID via Manager form endpoint "
         "(e.g. /customer-form/{key}). chart_of_accounts has no single form. "
         "For bank/cash account detail use resource=bank_accounts (not bank_balances)."
-    )
+    ),
+    annotations=_READ_ANNOTATIONS,
 )
 async def get_record(resource: str, key: str) -> dict[str, Any]:
     path = form_path(resource, key)
@@ -252,7 +282,94 @@ async def get_record(resource: str, key: str) -> dict[str, Any]:
     return {"resource": resource, "key": key, "body": body}
 
 
-@mcp.tool(description="Aged receivables / outstanding customer balances (read-only snapshot).")
+@mcp.tool(
+    description=(
+        "Search text inside LINE ITEM descriptions. resource: sales_invoices, "
+        "purchase_invoices, sales_quotes, purchase_quotes, sales_orders or purchase_orders. "
+        "list_records' `term` only matches "
+        "header-level fields (Reference, Customer/Supplier, the invoice's own Description); it "
+        "never sees text inside individual line items, so a search for text that only appears "
+        "on a line will come back empty there. Use this tool instead when the text might live "
+        "on a line. Pages the collection's headers, fetches each record's form, and returns "
+        "only records with at least one matching line (case-insensitive substring match). "
+        "Costs one extra Manager API call per header scanned; page_size is capped at 50; "
+        "page with `skip` (see `has_more`) to cover a whole collection."
+    ),
+    annotations=_READ_ANNOTATIONS,
+)
+async def search_line_items(
+    resource: str,
+    term: str,
+    skip: int = 0,
+    page_size: int = 25,
+) -> dict[str, Any]:
+    if resource not in _LINE_SEARCH_RESOURCES:
+        raise ValueError(
+            f"Unknown collection '{resource}' for line-item search. "
+            f"Use one of: {', '.join(sorted(_LINE_SEARCH_RESOURCES))}."
+        )
+    desc = resolve(resource)
+    page_size = max(1, min(page_size, 50))
+    client = get_client()
+    try:
+        header_body = await client.get(desc.path, params={"skip": skip, "pageSize": page_size})
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(f"Manager HTTP {exc.response.status_code}") from exc
+    headers = extract_items(desc, header_body)
+    total = header_body.get("totalRecords") if isinstance(header_body, dict) else None
+    if isinstance(total, int):
+        has_more = skip + len(headers) < total
+    else:
+        has_more = len(headers) >= page_size
+
+    needle = term.lower()
+    matches: list[dict[str, Any]] = []
+    for item in headers:
+        if not isinstance(item, dict):
+            continue
+        key = item.get("Key") or item.get("key")
+        if not key:
+            continue
+        path = form_path(resource, key)
+        if path is None:
+            continue
+        try:
+            form_body = await client.get(path)
+        except httpx.HTTPStatusError as exc:
+            raise RuntimeError(f"Manager HTTP {exc.response.status_code}") from exc
+        lines = form_body.get("Lines") if isinstance(form_body, dict) else None
+        if not isinstance(lines, list):
+            continue
+        texts = [
+            str(line.get("LineDescription") or line.get("Description") or "")
+            for line in lines
+            if isinstance(line, dict)
+        ]
+        matched_lines = [text for text in texts if needle in text.lower()]
+        if matched_lines:
+            matches.append(
+                {
+                    "Key": key,
+                    "Reference": item.get("Reference"),
+                    "Customer": item.get("Customer") or item.get("Supplier"),
+                    "matched_lines": matched_lines,
+                }
+            )
+    return {
+        "resource": resource,
+        "term": term,
+        "matches": matches,
+        "scanned": len(headers),
+        "skip": skip,
+        "page_size": page_size,
+        "has_more": has_more,
+    }
+
+
+@mcp.tool(
+    description="Aged receivables / outstanding customer balances (read-only snapshot).",
+    annotations=_READ_ANNOTATIONS,
+)
 async def aged_receivables(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -260,7 +377,7 @@ async def aged_receivables(
     return await _fetch_report("aged_receivables", from_date=from_date, to_date=to_date)
 
 
-@mcp.tool(description="Aged payables snapshot (read-only).")
+@mcp.tool(description="Aged payables snapshot (read-only).", annotations=_READ_ANNOTATIONS)
 async def aged_payables(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -272,7 +389,8 @@ async def aged_payables(
     description=(
         "Bank/cash balances snapshot (read-only). "
         "For search/drill-in of individual accounts use list_records/get_record on bank_accounts."
-    )
+    ),
+    annotations=_READ_ANNOTATIONS,
 )
 async def bank_balances(
     from_date: str | None = None,
@@ -281,7 +399,7 @@ async def bank_balances(
     return await _fetch_report("bank_balances", from_date=from_date, to_date=to_date)
 
 
-@mcp.tool(description="Trial balance snapshot (read-only).")
+@mcp.tool(description="Trial balance snapshot (read-only).", annotations=_READ_ANNOTATIONS)
 async def trial_balance(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -289,7 +407,7 @@ async def trial_balance(
     return await _fetch_report("trial_balance", from_date=from_date, to_date=to_date)
 
 
-@mcp.tool(description="Profit and loss snapshot (read-only).")
+@mcp.tool(description="Profit and loss snapshot (read-only).", annotations=_READ_ANNOTATIONS)
 async def profit_and_loss(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -297,7 +415,7 @@ async def profit_and_loss(
     return await _fetch_report("profit_and_loss", from_date=from_date, to_date=to_date)
 
 
-@mcp.tool(description="Balance sheet snapshot (read-only).")
+@mcp.tool(description="Balance sheet snapshot (read-only).", annotations=_READ_ANNOTATIONS)
 async def balance_sheet(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -305,7 +423,7 @@ async def balance_sheet(
     return await _fetch_report("balance_sheet", from_date=from_date, to_date=to_date)
 
 
-@mcp.tool(description="Tax summary snapshot (read-only).")
+@mcp.tool(description="Tax summary snapshot (read-only).", annotations=_READ_ANNOTATIONS)
 async def tax_summary(
     from_date: str | None = None,
     to_date: str | None = None,
@@ -669,7 +787,9 @@ def register_task_tools() -> None:
 def main() -> None:
     register_task_tools()
     register_write_tools()
-    mcp.run()
+    run_kwargs = build_run_kwargs()
+    mcp.auth = run_kwargs.pop("auth", None)
+    mcp.run(**run_kwargs)
 
 
 if __name__ == "__main__":

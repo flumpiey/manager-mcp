@@ -12,6 +12,15 @@ All notable changes to this project are documented in this file.
   no way to resolve one through the bridge - divisions were absent from the
   curated resource map. Read-only: divisions are setup data, so no
   `create_division` tool and no new write scope.
+- Remote HTTP mode (`MANAGER_MCP_TRANSPORT=http`): Streamable HTTP with Google
+  sign-in, an email allowlist that also requires a verified email, 24-hour
+  tokens, a loopback default bind, a `/health` route and a non-root container
+  image. HTTP client URL logging stays off so tokens never reach logs.
+  Originally contributed in PR #4 by gregsteel.
+- `search_line_items`: find sales and purchase invoices, quotes and orders by
+  line description text, at most 50 documents per call (PR #4).
+- `payment_rules` and `receipt_rules` list-only collections (PR #4).
+- Every read-only tool declares the MCP `readOnlyHint` annotation (PR #4).
 
 ## [0.3.0] - 2026-11-27
 
