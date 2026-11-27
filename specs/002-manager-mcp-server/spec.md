@@ -13,7 +13,7 @@
 ### Session 2026-11-27
 
 - Q: How long does a remote sign-in token last? A: 24 hours. A removed address loses access within a day, or at once on restart.
-- Q: Which documents does line-item search cover? A: Purchase and sales invoices, sales and purchase quotes, and sales and purchase orders, with one shared cap of 50 documents per search.
+- Q: Which documents does line-item search cover? A: Purchase and sales invoices, sales and purchase quotes, and sales and purchase orders, with one document type per call and at most 50 documents per call.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -97,7 +97,7 @@ Specs MUST respect `.specify/memory/constitution.md`:
 - **FR-005**: Issued sign-in tokens MUST expire within 24 hours.
 - **FR-006**: The system MUST NOT write access tokens, client secrets or API keys to logs, including URLs logged by the HTTP client library.
 - **FR-007**: The system MUST expose an unauthenticated health check that reveals no configuration or business data.
-- **FR-008**: The system MUST provide a read-only line-item search across purchase and sales invoices, quotes and orders that matches the term against line descriptions, capped at 50 documents per call across all types.
+- **FR-008**: The system MUST provide a read-only line-item search over purchase and sales invoices, quotes and orders, one document type per call, that matches the term against line descriptions, capped at 50 documents per call.
 - **FR-009**: The system MUST expose payment rules and receipt rules as list-only collections with no write tools under any scope.
 - **FR-010**: Every read-only tool MUST declare the MCP read-only annotation.
 - **FR-011**: The project MUST ship container packaging that runs the server as a non-root user with no secrets in the image.

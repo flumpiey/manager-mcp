@@ -25,7 +25,7 @@ curl -s http://127.0.0.1:8080/health
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/mcp
 ```
 
-Expected: `{"status":"ok"}`, then `401` for the unauthenticated MCP request. Unset `MANAGER_MCP_ALLOWED_EMAILS` and the server must exit with an error naming it.
+Expected: `ok`, then `401` for the unauthenticated MCP request. Unset `MANAGER_MCP_ALLOWED_EMAILS` and the server must exit with an error naming it.
 
 ## Not covered offline
 

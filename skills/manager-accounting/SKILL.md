@@ -20,7 +20,7 @@ Pairs with the **manager-mcp** MCP server.
 
 ## Boundary
 
-- Empty scopes → read-only tool set (10 tools).
+- Empty scopes → read-only tool set (11 tools).
 - Mutations need `MANAGER_MCP_WRITE_SCOPES` (create/update) and/or
   `MANAGER_MCP_DELETE_SCOPES` (delete). Delete is never implied by write.
 - Recommended write scopes: `banking,sales,parties` (not all nine domains).

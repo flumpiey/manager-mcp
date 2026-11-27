@@ -14,23 +14,26 @@
 
 ## HTTP routes
 
-- `GET /health`: unauthenticated, returns `{"status": "ok"}` and nothing else.
+- `GET /health`: unauthenticated, returns the text `ok` and nothing else.
 - `/mcp`: Streamable HTTP, requires a FastMCP-issued token from the Google sign-in flow.
 
 ## Tool: `search_line_items` (read-only)
 
-Input: `term` (string, required), `max_documents` (int, default 50, clamped to 1..50).
+Input: `resource` (one of `sales_invoices`, `purchase_invoices`, `sales_quotes`, `purchase_quotes`, `sales_orders`, `purchase_orders`), `term` (string, required), `skip` (int, default 0), `page_size` (int, default 25, clamped to 1..50). One call scans one page of one document type; page with `skip` while `has_more` is true.
 
 Output:
 
 ```json
 {
+  "resource": "sales_invoices",
   "term": "widget",
   "matches": [
-    {"resource": "sales_invoices", "key": "<guid>", "lines": ["<matching line text>"]}
+    {"Key": "<guid>", "Reference": "INV-1", "Customer": "<name>", "matched_lines": ["<line text>"]}
   ],
-  "documents_scanned": 12,
-  "truncated": false
+  "scanned": 25,
+  "skip": 0,
+  "page_size": 25,
+  "has_more": true
 }
 ```
 
